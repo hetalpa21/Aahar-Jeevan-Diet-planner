@@ -245,7 +245,7 @@ function Planner() {
 
         {/* Day editor */}
         <section className="overflow-x-auto print:overflow-visible">
-          <div className="grid min-w-[900px] grid-cols-5 gap-3 print:min-w-0">
+          <div className="grid min-w-[900px] grid-cols-5 gap-3 print:hidden">
             {SLOTS.map((slotName) => {
               const slot = currentDay.slots.find((s) => s.slotName === slotName)!;
               return (
