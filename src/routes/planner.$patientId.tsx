@@ -284,28 +284,62 @@ function Planner() {
             })}
           </div>
 
-          {/* Print preview — all days */}
-          <div className="mt-8 hidden print:block">
-            <h2 className="mb-4 text-2xl font-bold">{plan.title}</h2>
+          {/* Print preview — branded export */}
+          <div className="print-export hidden print:block">
+            <div className="print-header">
+              <img src={logo} alt="Aahar Jeevan" className="print-logo" />
+              <div className="print-brand">
+                <div className="print-brand-name">Shobhana Thakkar</div>
+                <div className="print-brand-sub">Nutritionist · Aahar Jeevan</div>
+                <div className="print-brand-sub">Mobile: 9687491796</div>
+              </div>
+            </div>
+
+            <div className="print-patient">
+              <div><span className="print-label">Name:</span> <span className="print-value">{patient.name}</span></div>
+              <div><span className="print-label">Current Weight:</span> <span className="print-value">{patient.weight ?? "—"} kg</span></div>
+              <div><span className="print-label">Ideal Body Weight:</span> <span className="print-value">{patient.idealWeight ?? "—"} kg</span></div>
+              <div><span className="print-label">BMI:</span> <span className="print-value">{patient.bmi ?? "—"}{patient.bmi ? " (±5)" : ""}</span></div>
+            </div>
+
+            <h2 className="print-plan-title">7-Day Diet Plan</h2>
+
             {plan.meals.map((m) => (
-              <div key={m.day} className="mb-6 break-inside-avoid">
-                <h3 className="mb-2 text-xl font-semibold">{fullDay(m.day)}</h3>
-                <div className="grid grid-cols-5 gap-2">
-                  {m.slots.map((s) => (
-                    <div key={s.slotName} className="rounded-md border p-2 text-sm">
-                      <div className="font-semibold">{s.slotName}</div>
-                      <div className="text-xs text-muted-foreground">{s.time}</div>
-                      <ul className="mt-1 space-y-1">
-                        {s.items.map((it, i) => {
-                          const food = store.foods.find((f) => f.id === it.foodId);
-                          return <li key={i}>{food?.name} — {it.portion}</li>;
-                        })}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
+              <div key={m.day} className="print-day">
+                <h3 className="print-day-title">{fullDay(m.day)}</h3>
+                <table className="print-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: "18%" }}>Meal</th>
+                      <th style={{ width: "14%" }}>Time</th>
+                      <th>Items</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {m.slots.map((s) => (
+                      <tr key={s.slotName}>
+                        <td className="print-slot">{s.slotName}</td>
+                        <td>{s.time || "—"}</td>
+                        <td>
+                          {s.items.length === 0 ? (
+                            <span className="print-empty">—</span>
+                          ) : (
+                            <ul className="print-items">
+                              {s.items.map((it, i) => {
+                                const food = store.foods.find((f) => f.id === it.foodId);
+                                return <li key={i}>{food?.name} <span className="print-portion">— {it.portion}</span></li>;
+                              })}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             ))}
+
+            <div className="print-footer">Prepared by Shobhana Thakkar · Aahar Jeevan · 9687491796</div>
           </div>
         </section>
       </div>
