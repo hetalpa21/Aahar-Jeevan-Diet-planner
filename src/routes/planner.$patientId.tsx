@@ -341,21 +341,19 @@ function Planner() {
         </section>
       </div>
 
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+      <AlertDialog open={blocker.status === 'blocked'} onOpenChange={(o) => !o && blocker.reset?.()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
             <AlertDialogDescription>Save draft before leaving?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button variant="outline" onClick={() => { const cb = confirm; setConfirm(null); cb?.(); }}>Discard</Button>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>Cancel</AlertDialogCancel>
+            <Button variant="outline" onClick={() => blocker.proceed?.()}>Discard</Button>
             <AlertDialogAction
               onClick={() => {
                 save(true);
-                const cb = confirm;
-                setConfirm(null);
-                cb?.();
+                blocker.proceed?.();
               }}
             >
               Save draft
