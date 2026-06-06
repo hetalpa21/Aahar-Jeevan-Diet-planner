@@ -38,7 +38,6 @@ function Index() {
     age: "",
     contact: "",
     currentWeight: "",
-    targetWeight: "",
     idealWeight: "",
     height: "",
     chest: "",
@@ -62,7 +61,6 @@ function Index() {
       age: Number(form.age) || 0,
       contact: form.contact,
       currentWeight: Number(form.currentWeight) || 0,
-      targetWeight: Number(form.targetWeight) || 0,
       idealWeight: Number(form.idealWeight) || undefined,
       height: Number(form.height) || undefined,
       chest: Number(form.chest) || undefined,
@@ -108,9 +106,8 @@ function Index() {
               <Field label="Age"><Input type="number" value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} /></Field>
               <Field label="Contact"><Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} /></Field>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3">
               <Field label="Current weight (kg)"><Input type="number" value={form.currentWeight} onChange={(e) => setForm({ ...form, currentWeight: e.target.value })} /></Field>
-              <Field label="Target weight (kg)"><Input type="number" value={form.targetWeight} onChange={(e) => setForm({ ...form, targetWeight: e.target.value })} /></Field>
               <Field label="Ideal body weight (kg)"><Input type="number" value={form.idealWeight} onChange={(e) => setForm({ ...form, idealWeight: e.target.value })} /></Field>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

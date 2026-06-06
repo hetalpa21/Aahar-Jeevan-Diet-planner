@@ -6,7 +6,6 @@ export interface Patient {
   age: number;
   contact: string;
   currentWeight: number;
-  targetWeight: number;
   paymentStatus: PaymentStatus;
   lastPlanDate?: string;
   notes?: string;

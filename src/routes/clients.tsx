@@ -98,7 +98,6 @@ function ClientList() {
                   <th className="px-4 py-3 font-medium">Name</th>
                   <th className="px-4 py-3 font-medium">Age</th>
                   <th className="px-4 py-3 font-medium">Current</th>
-                  <th className="px-4 py-3 font-medium">Target</th>
                   <th className="px-4 py-3 font-medium">Last plan</th>
                   <th className="px-4 py-3 font-medium">Payment</th>
                   <th className="px-4 py-3 font-medium">Actions</th>
@@ -120,7 +119,6 @@ function ClientList() {
                     </td>
                     <td className="px-4 py-3">{p.age}</td>
                     <td className="px-4 py-3">{p.currentWeight} kg</td>
-                    <td className="px-4 py-3">{p.targetWeight} kg</td>
                     <td className="px-4 py-3">{p.lastPlanDate ?? "—"}</td>
                     <td className="px-4 py-3"><StatusBadge status={p.paymentStatus} /></td>
                     <td className="px-4 py-3">
@@ -137,7 +135,7 @@ function ClientList() {
                   </tr>
                 ))}
                 {rows.length === 0 && (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">No clients match your filters.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No clients match your filters.</td></tr>
                 )}
               </tbody>
             </table>

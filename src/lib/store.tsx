@@ -12,11 +12,11 @@ interface StoreState {
 
 const SEED: StoreState = {
   patients: [
-    { id: "p1", name: "Sonia Verma", age: 30, contact: "+91-98200-12345", currentWeight: 72, targetWeight: 65, paymentStatus: "Pending", lastPlanDate: "2026-05-25" },
-    { id: "p2", name: "Matthew Green", age: 45, contact: "+1-855-230-7860", currentWeight: 180, targetWeight: 170, paymentStatus: "Done", lastPlanDate: "2026-04-15" },
-    { id: "p3", name: "Sarah Lee", age: 52, contact: "+1-835-123-4567", currentWeight: 155, targetWeight: 135, paymentStatus: "Pending", lastPlanDate: "2026-04-10" },
-    { id: "p4", name: "David Patel", age: 38, contact: "+1-555-867-8543", currentWeight: 210, targetWeight: 200, paymentStatus: "Partial", lastPlanDate: "2026-04-05" },
-    { id: "p5", name: "Samantha Clark", age: 47, contact: "+1-555-855-7890", currentWeight: 130, targetWeight: 125, paymentStatus: "Done", lastPlanDate: "2026-03-25" },
+    { id: "p1", name: "Sonia Verma", age: 30, contact: "+91-98200-12345", currentWeight: 72, paymentStatus: "Pending", lastPlanDate: "2026-05-25" },
+    { id: "p2", name: "Matthew Green", age: 45, contact: "+1-855-230-7860", currentWeight: 180, paymentStatus: "Done", lastPlanDate: "2026-04-15" },
+    { id: "p3", name: "Sarah Lee", age: 52, contact: "+1-835-123-4567", currentWeight: 155, paymentStatus: "Pending", lastPlanDate: "2026-04-10" },
+    { id: "p4", name: "David Patel", age: 38, contact: "+1-555-867-8543", currentWeight: 210, paymentStatus: "Partial", lastPlanDate: "2026-04-05" },
+    { id: "p5", name: "Samantha Clark", age: 47, contact: "+1-555-855-7890", currentWeight: 130, paymentStatus: "Done", lastPlanDate: "2026-03-25" },
   ],
   foods: [
     { id: "f1", name: "Oats", serving: "40g", calories: 150, protein: 5, carbs: 27, fats: 3, category: "Grains", notes: "Cook with water or milk" },
