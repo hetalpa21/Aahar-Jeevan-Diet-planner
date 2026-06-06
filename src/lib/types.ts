@@ -10,6 +10,13 @@ export interface Patient {
   paymentStatus: PaymentStatus;
   lastPlanDate?: string;
   notes?: string;
+  idealWeight?: number;
+  height?: number;
+  chest?: number;
+  waist?: number;
+  lowerWaist?: number;
+  thigh?: number;
+  bmi?: number;
 }
 
 export interface FoodItem {
