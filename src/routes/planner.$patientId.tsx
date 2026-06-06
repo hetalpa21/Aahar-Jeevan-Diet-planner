@@ -46,6 +46,7 @@ function Planner() {
 
   const [plan, setPlan] = useState<Plan>(() => store.getPlanForPatient(patientId));
   const [dirty, setDirty] = useState(false);
+  const blocker = useBlocker({ shouldBlockFn: () => dirty, enableBeforeUnload: dirty, withResolver: true });
   const [day, setDay] = useState<DayKey>("Mon");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("All");
