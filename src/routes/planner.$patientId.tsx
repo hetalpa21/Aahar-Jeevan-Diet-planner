@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useBlocker } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,10 +46,11 @@ function Planner() {
 
   const [plan, setPlan] = useState<Plan>(() => store.getPlanForPatient(patientId));
   const [dirty, setDirty] = useState(false);
+  const blocker = useBlocker({ shouldBlockFn: () => dirty, enableBeforeUnload: dirty, withResolver: true });
   const [day, setDay] = useState<DayKey>("Mon");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("All");
-  const [confirm, setConfirm] = useState<null | (() => void)>(null);
+  
   const [foodDialog, setFoodDialog] = useState<{ open: boolean; food: FoodItem | null }>({ open: false, food: null });
   // Re-init plan when store hydrates
   const didInit = useRef(false);
@@ -135,11 +136,7 @@ function Planner() {
   }
 
   function goHome() {
-    if (dirty) {
-      setConfirm(() => () => navigate({ to: "/" }));
-    } else {
-      navigate({ to: "/" });
-    }
+    navigate({ to: "/" });
   }
 
   function exportPDF() {
@@ -344,21 +341,19 @@ function Planner() {
         </section>
       </div>
 
-      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+      <AlertDialog open={blocker.status === 'blocked'} onOpenChange={(o) => !o && blocker.reset?.()}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>You have unsaved changes</AlertDialogTitle>
             <AlertDialogDescription>Save draft before leaving?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button variant="outline" onClick={() => { const cb = confirm; setConfirm(null); cb?.(); }}>Discard</Button>
+            <AlertDialogCancel onClick={() => blocker.reset?.()}>Cancel</AlertDialogCancel>
+            <Button variant="outline" onClick={() => blocker.proceed?.()}>Discard</Button>
             <AlertDialogAction
               onClick={() => {
                 save(true);
-                const cb = confirm;
-                setConfirm(null);
-                cb?.();
+                blocker.proceed?.();
               }}
             >
               Save draft
