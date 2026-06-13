@@ -196,6 +196,7 @@
 .print-items { margin: 0; padding-left: 16px; }
 .print-items li { margin-bottom: 2px; }
 .print-portion { color: #666; font-size: 11px; }
+.print-notes { display: block; color: #555; font-size: 10px; font-style: italic; margin-top: 1px; }
 .print-empty { color: #999; }
 
 .print-footer {

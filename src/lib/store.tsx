@@ -1,116 +1,209 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { FoodItem, Patient, Plan } from "./types";
+import { createContext, useContext, type ReactNode } from "react";
+import type { FoodItem, Patient, Plan, ProgressEntry } from "./types";
 import { emptyPlan } from "./types";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  getPatients,
+  addPatient as apiAddPatient,
+  updatePatient as apiUpdatePatient,
+  deletePatient as apiDeletePatient,
+  getFoods,
+  addFood as apiAddFood,
+  updateFood as apiUpdateFood,
+  deleteFood as apiDeleteFood,
+  getPlanForPatient as apiGetPlanForPatient,
+  savePlan as apiSavePlan,
+  getProgressForPatient as apiGetProgress,
+  addProgressEntry as apiAddProgress,
+  updateProgressEntry as apiUpdateProgress,
+  deleteProgressEntry as apiDeleteProgress,
+} from "./api/database.functions";
 
-const KEY = "aahar_jeevan_v1";
-
-interface StoreState {
+interface StoreCtx {
   patients: Patient[];
   foods: FoodItem[];
   plans: Plan[];
-}
-
-const SEED: StoreState = {
-  patients: [
-    { id: "p1", name: "Sonia Verma", age: 30, contact: "+91-98200-12345", currentWeight: 72, paymentStatus: "Pending", lastPlanDate: "2026-05-25" },
-    { id: "p2", name: "Matthew Green", age: 45, contact: "+1-855-230-7860", currentWeight: 180, paymentStatus: "Done", lastPlanDate: "2026-04-15" },
-    { id: "p3", name: "Sarah Lee", age: 52, contact: "+1-835-123-4567", currentWeight: 155, paymentStatus: "Pending", lastPlanDate: "2026-04-10" },
-    { id: "p4", name: "David Patel", age: 38, contact: "+1-555-867-8543", currentWeight: 210, paymentStatus: "Partial", lastPlanDate: "2026-04-05" },
-    { id: "p5", name: "Samantha Clark", age: 47, contact: "+1-555-855-7890", currentWeight: 130, paymentStatus: "Done", lastPlanDate: "2026-03-25" },
-  ],
-  foods: [
-    { id: "f1", name: "Oats", serving: "40g", calories: 150, protein: 5, carbs: 27, fats: 3, category: "Grains", notes: "Cook with water or milk" },
-    { id: "f2", name: "Grilled Chicken", serving: "100g", calories: 165, protein: 31, carbs: 0, fats: 4, category: "Protein" },
-    { id: "f3", name: "Apple", serving: "1 medium", calories: 95, protein: 0, carbs: 25, fats: 0, category: "Fruits" },
-    { id: "f4", name: "Banana", serving: "1 medium", calories: 105, protein: 1, carbs: 27, fats: 0, category: "Fruits" },
-    { id: "f5", name: "Almonds", serving: "10 nuts", calories: 70, protein: 3, carbs: 2, fats: 6, category: "Nuts" },
-    { id: "f6", name: "Brown Rice", serving: "1 bowl", calories: 215, protein: 5, carbs: 45, fats: 2, category: "Grains" },
-    { id: "f7", name: "Boiled Eggs", serving: "2 eggs", calories: 155, protein: 13, carbs: 1, fats: 11, category: "Protein" },
-    { id: "f8", name: "Mixed Vegetables", serving: "1 bowl", calories: 80, protein: 3, carbs: 16, fats: 1, category: "Vegetables" },
-    { id: "f9", name: "Greek Yogurt", serving: "150g", calories: 130, protein: 11, carbs: 9, fats: 5, category: "Dairy" },
-  ],
-  plans: [],
-};
-
-function load(): StoreState {
-  if (typeof window === "undefined") return SEED;
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return SEED;
-    return JSON.parse(raw);
-  } catch {
-    return SEED;
-  }
-}
-
-interface StoreCtx extends StoreState {
-  addPatient: (p: Omit<Patient, "id">) => Patient;
-  updatePatient: (id: string, p: Partial<Patient>) => void;
-  addFood: (f: Omit<FoodItem, "id">) => FoodItem;
-  updateFood: (id: string, f: Partial<FoodItem>) => void;
-  deleteFood: (id: string) => void;
-  savePlan: (plan: Plan) => void;
-  getPlanForPatient: (patientId: string) => Plan;
+  loading: boolean;
+  addPatient: (p: Omit<Patient, "id">) => Promise<Patient>;
+  updatePatient: (id: string, p: Partial<Patient>) => Promise<void>;
+  deletePatient: (id: string) => Promise<void>;
+  addFood: (f: Omit<FoodItem, "id">) => Promise<FoodItem>;
+  updateFood: (id: string, f: Partial<FoodItem>) => Promise<void>;
+  deleteFood: (id: string) => Promise<void>;
+  savePlan: (plan: Plan) => Promise<Plan>;
+  getPlanForPatient: (patientId: string) => Promise<Plan>;
+  getProgressForPatient: (patientId: string) => Promise<ProgressEntry[]>;
+  addProgressEntry: (entry: Omit<ProgressEntry, "id" | "recordedAt">) => Promise<ProgressEntry>;
+  updateProgressEntry: (id: string, patch: Partial<ProgressEntry>) => Promise<void>;
+  deleteProgressEntry: (id: string, patientId: string) => Promise<void>;
 }
 
 const Ctx = createContext<StoreCtx | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<StoreState>(SEED);
-  const [hydrated, setHydrated] = useState(false);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    setState(load());
-    setHydrated(true);
-  }, []);
+  // Queries
+  const { data: patients = [], isLoading: loadingPatients } = useQuery({
+    queryKey: ["patients"],
+    queryFn: () => getPatients(),
+  });
 
-  useEffect(() => {
-    if (hydrated) localStorage.setItem(KEY, JSON.stringify(state));
-  }, [state, hydrated]);
+  const { data: foods = [], isLoading: loadingFoods } = useQuery({
+    queryKey: ["foods"],
+    queryFn: () => getFoods(),
+  });
+
+  // Mutations with optimistic updates
+
+  const addPatientMutation = useMutation({
+    mutationFn: (p: Omit<Patient, "id">) => apiAddPatient({ data: p }),
+    onSuccess: (newPatient) => {
+      queryClient.setQueryData<Patient[]>(["patients"], (old = []) => [...old, newPatient]);
+    },
+  });
+
+  const updatePatientMutation = useMutation({
+    mutationFn: (args: { id: string; patch: Partial<Patient> }) =>
+      apiUpdatePatient({ data: args }),
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({ queryKey: ["patients"] });
+      const prev = queryClient.getQueryData<Patient[]>(["patients"]);
+      queryClient.setQueryData<Patient[]>(["patients"], (old = []) =>
+        old.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["patients"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["patients"] }),
+  });
+
+  const deletePatientMutation = useMutation({
+    mutationFn: (id: string) => apiDeletePatient({ data: id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["patients"] });
+      const prev = queryClient.getQueryData<Patient[]>(["patients"]);
+      queryClient.setQueryData<Patient[]>(["patients"], (old = []) =>
+        old.filter((p) => p.id !== id),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["patients"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["patients"] }),
+  });
+
+  const addFoodMutation = useMutation({
+    mutationFn: (f: Omit<FoodItem, "id">) => apiAddFood({ data: f }),
+    onSuccess: (newFood) => {
+      queryClient.setQueryData<FoodItem[]>(["foods"], (old = []) => [newFood, ...old]);
+    },
+  });
+
+  const updateFoodMutation = useMutation({
+    mutationFn: (args: { id: string; patch: Partial<FoodItem> }) =>
+      apiUpdateFood({ data: args }),
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({ queryKey: ["foods"] });
+      const prev = queryClient.getQueryData<FoodItem[]>(["foods"]);
+      queryClient.setQueryData<FoodItem[]>(["foods"], (old = []) =>
+        old.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["foods"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["foods"] }),
+  });
+
+  const deleteFoodMutation = useMutation({
+    mutationFn: (id: string) => apiDeleteFood({ data: id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["foods"] });
+      const prev = queryClient.getQueryData<FoodItem[]>(["foods"]);
+      queryClient.setQueryData<FoodItem[]>(["foods"], (old = []) =>
+        old.filter((f) => f.id !== id),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["foods"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["foods"] }),
+  });
+
+  const savePlanMutation = useMutation({
+    mutationFn: (plan: Plan) => apiSavePlan({ data: plan }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["patients"] });
+      queryClient.invalidateQueries({ queryKey: ["plan", data.patientId] });
+    },
+  });
+
+  const addProgressMutation = useMutation({
+    mutationFn: (e: Omit<ProgressEntry, "id" | "recordedAt">) => apiAddProgress({ data: e }),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["progress", vars.patientId] });
+    },
+  });
+
+  const updateProgressMutation = useMutation({
+    mutationFn: (args: { id: string; patch: Partial<ProgressEntry> }) =>
+      apiUpdateProgress({ data: args }),
+  });
+
+  const deleteProgressMutation = useMutation({
+    mutationFn: (id: string) => apiDeleteProgress({ data: id }),
+  });
 
   const value: StoreCtx = {
-    ...state,
-    addPatient: (p) => {
-      const newP: Patient = { ...p, id: `p_${Date.now()}` };
-      setState((s) => ({ ...s, patients: [newP, ...s.patients] }));
-      return newP;
+    patients,
+    foods,
+    plans: [],
+    loading: loadingPatients || loadingFoods,
+    addPatient: async (p) => {
+      return await addPatientMutation.mutateAsync(p);
     },
-    updatePatient: (id, patch) =>
-      setState((s) => ({
-        ...s,
-        patients: s.patients.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-      })),
-    addFood: (f) => {
-      const newF: FoodItem = { ...f, id: `f_${Date.now()}` };
-      setState((s) => ({ ...s, foods: [...s.foods, newF] }));
-      return newF;
+    updatePatient: async (id, patch) => {
+      await updatePatientMutation.mutateAsync({ id, patch });
     },
-    updateFood: (id, patch) =>
-      setState((s) => ({
-        ...s,
-        foods: s.foods.map((f) => (f.id === id ? { ...f, ...patch } : f)),
-      })),
-    deleteFood: (id) =>
-      setState((s) => ({ ...s, foods: s.foods.filter((f) => f.id !== id) })),
-    savePlan: (plan) => {
-      setState((s) => {
-        const exists = s.plans.some((p) => p.id === plan.id);
-        const plans = exists
-          ? s.plans.map((p) => (p.id === plan.id ? plan : p))
-          : [...s.plans, plan];
-        const patients = s.patients.map((p) =>
-          p.id === plan.patientId
-            ? { ...p, lastPlanDate: new Date().toISOString().slice(0, 10) }
-            : p,
-        );
-        return { ...s, plans, patients };
-      });
+    deletePatient: async (id) => {
+      await deletePatientMutation.mutateAsync(id);
     },
-    getPlanForPatient: (patientId) => {
-      const existing = state.plans.find((p) => p.patientId === patientId);
-      if (existing) return existing;
-      const patient = state.patients.find((p) => p.id === patientId);
+    addFood: async (f) => {
+      return await addFoodMutation.mutateAsync(f);
+    },
+    updateFood: async (id, patch) => {
+      await updateFoodMutation.mutateAsync({ id, patch });
+    },
+    deleteFood: async (id) => {
+      await deleteFoodMutation.mutateAsync(id);
+    },
+    savePlan: async (plan) => {
+      return await savePlanMutation.mutateAsync(plan);
+    },
+    getPlanForPatient: async (patientId) => {
+      const plan = await apiGetPlanForPatient({ data: patientId });
+      if (plan) return plan;
+      const patient = patients.find((p) => p.id === patientId);
       return emptyPlan(patientId, patient?.name ?? "Patient");
+    },
+    getProgressForPatient: async (patientId) => {
+      return await apiGetProgress({ data: patientId });
+    },
+    addProgressEntry: async (entry) => {
+      return await addProgressMutation.mutateAsync(entry);
+    },
+    updateProgressEntry: async (id, patch) => {
+      await updateProgressMutation.mutateAsync({ id, patch });
+    },
+    deleteProgressEntry: async (id, patientId) => {
+      await deleteProgressMutation.mutateAsync(id);
+      queryClient.invalidateQueries({ queryKey: ["progress", patientId] });
     },
   };
 

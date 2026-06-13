@@ -1,12 +1,17 @@
 export type PaymentStatus = "Done" | "Pending" | "Partial";
 
+export type Gender = "Male" | "Female" | "Other";
+
 export interface Patient {
   id: string;
   name: string;
   age: number;
   contact: string;
+  gender?: Gender;
   currentWeight: number;
   paymentStatus: PaymentStatus;
+  totalAmount?: number;
+  amountReceived?: number;
   lastPlanDate?: string;
   notes?: string;
   idealWeight?: number;
@@ -16,6 +21,18 @@ export interface Patient {
   lowerWaist?: number;
   thigh?: number;
   bmi?: number;
+}
+
+export interface ProgressEntry {
+  id: string;
+  patientId: string;
+  weekNumber: number;
+  weight?: number;
+  waist?: number;
+  lowerWaist?: number;
+  thigh?: number;
+  notes?: string;
+  recordedAt: string;
 }
 
 export interface FoodItem {
@@ -33,15 +50,16 @@ export interface FoodItem {
 export type DayKey = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
 export const DAYS: DayKey[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export type SlotName = "Early Morning" | "Breakfast" | "Lunch" | "Evening Snack" | "Dinner";
-export const SLOTS: SlotName[] = [
+export type SlotName = string;
+export const DEFAULT_SLOTS: string[] = [
   "Early Morning",
   "Breakfast",
   "Lunch",
   "Evening Snack",
   "Dinner",
 ];
-export const DEFAULT_TIMES: Record<SlotName, string> = {
+export const SLOTS = DEFAULT_SLOTS; // backward compat alias
+export const DEFAULT_TIMES: Record<string, string> = {
   "Early Morning": "06:30",
   Breakfast: "08:00",
   Lunch: "13:00",

@@ -1,29 +1,37 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { ExternalLink } from "lucide-react";
-import logoAsset from "@/assets/logo.png.asset.json";
-const logo = logoAsset.url;
+import { Bell, UserCircle } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 export function AppHeader() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isDash = pathname === "/";
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-[var(--header-bg)] backdrop-blur print:hidden">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2" aria-label="Aahar Jeevan home">
-          <img src={logo} alt="Aahar Jeevan" width={44} height={44} className="h-11 w-11 rounded-md object-contain" />
+    <header className="sticky top-0 z-30 bg-[#00361a] shadow-[0_4px_20px_-4px_rgba(27,77,46,0.25)] print:hidden">
+      <div className="mx-auto flex h-[68px] max-w-[1280px] items-center justify-between px-5 sm:px-10">
+        {/* Brand name */}
+        <Link to="/" className="flex items-center gap-2.5 group" aria-label="Aahar Jeevan home">
+          <span className="text-[28px] font-bold tracking-tight text-white sm:text-[32px]" style={{ fontFamily: "'Manrope', sans-serif" }}>
+            Aahar Jeevan
+          </span>
         </Link>
-        <nav className="flex items-center gap-1 sm:gap-2">
+
+        {/* Navigation — centered */}
+        <nav className="hidden items-center gap-8 sm:flex">
           <NavLink to="/" label="Home" active={isDash} />
           <NavLink to="/clients" label="Client List" active={pathname.startsWith("/clients")} />
           <NavLink to="/catalogue" label="Food Catalogue" active={pathname.startsWith("/catalogue")} />
         </nav>
-        <button
-          aria-label="External link"
-          className="rounded-md p-2 text-muted-foreground hover:bg-muted"
-        >
-          <ExternalLink className="h-5 w-5" />
-        </button>
+
+        {/* Trailing icons */}
+        <div className="flex items-center gap-2">
+          <button className="rounded-full p-2 text-white/80 transition hover:bg-white/10 hover:text-white active:scale-90" aria-label="Notifications">
+            <Bell className="h-5 w-5" />
+          </button>
+          <button className="rounded-full p-2 text-white/80 transition hover:bg-white/10 hover:text-white active:scale-90" aria-label="Account">
+            <UserCircle className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </header>
   );
@@ -34,16 +42,13 @@ function NavLink({ to, label, active }: { to: string; label: string; active: boo
     <Link
       to={to}
       className={
-        "relative px-3 py-2 text-sm font-medium transition-colors sm:text-base " +
+        "relative pb-1 text-[14px] font-semibold tracking-wide transition-colors " +
         (active
-          ? "text-[var(--dark-green)]"
-          : "text-[var(--dark-green)]/70 hover:text-[var(--dark-green)]")
+          ? "text-white border-b-2 border-white"
+          : "text-white/70 hover:text-white")
       }
     >
       {label}
-      {active && (
-        <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[var(--primary-orange)]" />
-      )}
     </Link>
   );
 }

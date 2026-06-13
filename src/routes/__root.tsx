@@ -13,6 +13,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../lib/store";
 import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider, useAuth } from "@/lib/useAuth";
+import { LoginScreen } from "@/components/LoginScreen";
 
 function NotFoundComponent() {
   return (
@@ -90,6 +92,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       {
+        rel: "preconnect",
+        href: "https://fonts.googleapis.com",
+      },
+      {
+        rel: "preconnect",
+        href: "https://fonts.gstatic.com",
+        crossOrigin: "anonymous" as const,
+      },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap",
+      },
+      {
         rel: "stylesheet",
         href: appCss,
       },
@@ -120,10 +135,38 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <Outlet />
-        <Toaster richColors position="top-right" />
-      </StoreProvider>
+      <AuthProvider>
+        <AuthGate queryClient={queryClient} />
+      </AuthProvider>
     </QueryClientProvider>
+  );
+}
+
+function AuthGate({ queryClient }: { queryClient: QueryClient }) {
+  const { isAuthenticated, loading, logout } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-muted-foreground animate-pulse text-lg">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <StoreProvider>
+      <Outlet />
+      <Toaster richColors position="top-right" />
+      <button
+        onClick={logout}
+        className="fixed bottom-4 right-4 z-50 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-sm transition hover:bg-destructive/10 hover:text-destructive print:hidden"
+      >
+        Logout
+      </button>
+    </StoreProvider>
   );
 }

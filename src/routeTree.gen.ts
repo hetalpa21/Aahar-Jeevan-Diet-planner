@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ClientsRouteImport } from './routes/clients'
 import { Route as CatalogueRouteImport } from './routes/catalogue'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProgressPatientIdRouteImport } from './routes/progress.$patientId'
 import { Route as PlannerPatientIdRouteImport } from './routes/planner.$patientId'
 
 const ClientsRoute = ClientsRouteImport.update({
@@ -29,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgressPatientIdRoute = ProgressPatientIdRouteImport.update({
+  id: '/progress/$patientId',
+  path: '/progress/$patientId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlannerPatientIdRoute = PlannerPatientIdRouteImport.update({
   id: '/planner/$patientId',
   path: '/planner/$patientId',
@@ -40,12 +46,14 @@ export interface FileRoutesByFullPath {
   '/catalogue': typeof CatalogueRoute
   '/clients': typeof ClientsRoute
   '/planner/$patientId': typeof PlannerPatientIdRoute
+  '/progress/$patientId': typeof ProgressPatientIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/catalogue': typeof CatalogueRoute
   '/clients': typeof ClientsRoute
   '/planner/$patientId': typeof PlannerPatientIdRoute
+  '/progress/$patientId': typeof ProgressPatientIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,30 @@ export interface FileRoutesById {
   '/catalogue': typeof CatalogueRoute
   '/clients': typeof ClientsRoute
   '/planner/$patientId': typeof PlannerPatientIdRoute
+  '/progress/$patientId': typeof ProgressPatientIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/catalogue' | '/clients' | '/planner/$patientId'
+  fullPaths:
+    | '/'
+    | '/catalogue'
+    | '/clients'
+    | '/planner/$patientId'
+    | '/progress/$patientId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/catalogue' | '/clients' | '/planner/$patientId'
-  id: '__root__' | '/' | '/catalogue' | '/clients' | '/planner/$patientId'
+  to:
+    | '/'
+    | '/catalogue'
+    | '/clients'
+    | '/planner/$patientId'
+    | '/progress/$patientId'
+  id:
+    | '__root__'
+    | '/'
+    | '/catalogue'
+    | '/clients'
+    | '/planner/$patientId'
+    | '/progress/$patientId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +92,7 @@ export interface RootRouteChildren {
   CatalogueRoute: typeof CatalogueRoute
   ClientsRoute: typeof ClientsRoute
   PlannerPatientIdRoute: typeof PlannerPatientIdRoute
+  ProgressPatientIdRoute: typeof ProgressPatientIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,6 +118,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/progress/$patientId': {
+      id: '/progress/$patientId'
+      path: '/progress/$patientId'
+      fullPath: '/progress/$patientId'
+      preLoaderRoute: typeof ProgressPatientIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/planner/$patientId': {
       id: '/planner/$patientId'
       path: '/planner/$patientId'
@@ -107,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   CatalogueRoute: CatalogueRoute,
   ClientsRoute: ClientsRoute,
   PlannerPatientIdRoute: PlannerPatientIdRoute,
+  ProgressPatientIdRoute: ProgressPatientIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

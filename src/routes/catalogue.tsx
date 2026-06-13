@@ -56,7 +56,7 @@ function Catalogue() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--dark-green)]">{f.name}</h3>
-                  <p className="text-sm text-muted-foreground">{f.serving} · {f.calories} kcal</p>
+
                   {f.category && (
                     <span className="mt-2 inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{f.category}</span>
                   )}
@@ -65,16 +65,19 @@ function Catalogue() {
                   <button onClick={() => openEdit(f)} aria-label="Edit" className="rounded-md p-2 text-muted-foreground hover:bg-muted">
                     <Pencil className="h-4 w-4" />
                   </button>
-                  <button onClick={() => { deleteFood(f.id); toast.success("Item removed"); }} aria-label="Delete" className="rounded-md p-2 text-destructive hover:bg-destructive/10">
+                  <button onClick={async () => {
+                    try {
+                      await deleteFood(f.id);
+                      toast.success("Item removed");
+                    } catch (err: any) {
+                      toast.error("Failed to remove item: " + err.message);
+                    }
+                  }} aria-label="Delete" className="rounded-md p-2 text-destructive hover:bg-destructive/10">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-                <Stat label="Protein" v={f.protein} />
-                <Stat label="Carbs" v={f.carbs} />
-                <Stat label="Fats" v={f.fats} />
-              </div>
+
               {f.notes && <p className="mt-3 text-xs text-muted-foreground">{f.notes}</p>}
             </div>
           ))}
@@ -85,13 +88,17 @@ function Catalogue() {
         open={open}
         onClose={() => setOpen(false)}
         food={editing}
-        onSave={(data) => {
-          if (editing) {
-            updateFood(editing.id, data);
-            toast.success("Item updated");
-          } else {
-            addFood(data);
-            toast.success("Item added");
+        onSave={async (data) => {
+          try {
+            if (editing) {
+              await updateFood(editing.id, data);
+              toast.success("Item updated");
+            } else {
+              await addFood(data);
+              toast.success("Item added");
+            }
+          } catch (err: any) {
+            toast.error("Failed to save item: " + err.message);
           }
           setOpen(false);
         }}
@@ -100,14 +107,7 @@ function Catalogue() {
   );
 }
 
-function Stat({ label, v }: { label: string; v?: number }) {
-  return (
-    <div className="rounded-md bg-muted/50 py-1">
-      <div className="font-semibold">{v ?? 0}g</div>
-      <div className="text-muted-foreground">{label}</div>
-    </div>
-  );
-}
+
 
 export function FoodDialog({
   open,
@@ -121,21 +121,11 @@ export function FoodDialog({
   onSave: (data: Omit<FoodItem, "id">) => void;
 }) {
   const [name, setName] = useState(food?.name ?? "");
-  const [serving, setServing] = useState(food?.serving ?? "");
-  const [calories, setCalories] = useState(String(food?.calories ?? ""));
-  const [protein, setProtein] = useState(String(food?.protein ?? ""));
-  const [carbs, setCarbs] = useState(String(food?.carbs ?? ""));
-  const [fats, setFats] = useState(String(food?.fats ?? ""));
   const [notes, setNotes] = useState(food?.notes ?? "");
 
   // re-init when food changes
   useStateSync(food, (f) => {
     setName(f?.name ?? "");
-    setServing(f?.serving ?? "");
-    setCalories(String(f?.calories ?? ""));
-    setProtein(String(f?.protein ?? ""));
-    setCarbs(String(f?.carbs ?? ""));
-    setFats(String(f?.fats ?? ""));
     setNotes(f?.notes ?? "");
   });
 
@@ -143,11 +133,11 @@ export function FoodDialog({
     if (!name.trim()) { toast.error("Name is required"); return; }
     onSave({
       name: name.trim(),
-      serving: serving.trim() || "1 serving",
-      calories: Number(calories) || 0,
-      protein: Number(protein) || 0,
-      carbs: Number(carbs) || 0,
-      fats: Number(fats) || 0,
+      serving: "",
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fats: 0,
       notes,
     });
   }
@@ -160,15 +150,6 @@ export function FoodDialog({
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5"><Label>Serving</Label><Input value={serving} onChange={(e) => setServing(e.target.value)} placeholder="40g" /></div>
-            <div className="grid gap-1.5"><Label>Calories</Label><Input type="number" value={calories} onChange={(e) => setCalories(e.target.value)} /></div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="grid gap-1.5"><Label>Protein</Label><Input type="number" value={protein} onChange={(e) => setProtein(e.target.value)} /></div>
-            <div className="grid gap-1.5"><Label>Carbs</Label><Input type="number" value={carbs} onChange={(e) => setCarbs(e.target.value)} /></div>
-            <div className="grid gap-1.5"><Label>Fats</Label><Input type="number" value={fats} onChange={(e) => setFats(e.target.value)} /></div>
-          </div>
           <div className="grid gap-1.5"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">Hint: Items can be added and edited from the Diet Planner.</p>
         </div>
