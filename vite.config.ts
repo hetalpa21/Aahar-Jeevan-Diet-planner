@@ -12,4 +12,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  vite: {
+    plugins: [
+      import("nitro/vite").then(({ nitro }) => nitro({ preset: "vercel" })) as any
+    ]
+  }
 });
