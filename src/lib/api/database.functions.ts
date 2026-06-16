@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { supabase } from "../supabase.server";
-import type { Patient, FoodItem, Plan, ProgressEntry } from "../types";
+import type { Patient, FoodItem, Plan, ProgressEntry, Instruction } from "../types";
 
 // ==========================================
 // PATIENTS SERVER FUNCTIONS
@@ -228,6 +228,7 @@ export const getPlanForPatient = createServerFn({ method: "GET" })
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       meals: data.meals,
+      instructions: data.instructions ?? { tips: [], avoidList: [] },
     } as Plan;
   });
 
@@ -251,6 +252,7 @@ export const savePlan = createServerFn({ method: "POST" })
           title: p.title,
           is_draft: p.isDraft,
           meals: p.meals,
+          instructions: p.instructions ?? { tips: [], avoidList: [] },
           updated_at: new Date().toISOString(),
         })
         .eq("id", existing.id)
@@ -267,6 +269,7 @@ export const savePlan = createServerFn({ method: "POST" })
           title: p.title,
           is_draft: p.isDraft,
           meals: p.meals,
+          instructions: p.instructions ?? { tips: [], avoidList: [] },
           updated_at: new Date().toISOString(),
         })
         .select()
@@ -294,6 +297,7 @@ export const savePlan = createServerFn({ method: "POST" })
       createdAt: planData.created_at,
       updatedAt: planData.updated_at,
       meals: planData.meals,
+      instructions: planData.instructions ?? { tips: [], avoidList: [] },
     } as Plan;
   });
 
@@ -391,6 +395,73 @@ export const deleteProgressEntry = createServerFn({ method: "POST" })
   .handler(async ({ data: id }: { data: string }) => {
     const { error } = await supabase
       .from("progress_entries")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+// ==========================================
+// INSTRUCTIONS SERVER FUNCTIONS
+// ==========================================
+
+export const getInstructions = createServerFn({ method: "GET" }).handler(async () => {
+  const { data, error } = await supabase
+    .from("instructions")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r: any) => ({
+    id: r.id,
+    text: r.text,
+    category: r.category,
+    isHighlighted: r.is_highlighted ?? false,
+  })) as Instruction[];
+});
+
+export const addInstruction = createServerFn({ method: "POST" })
+  .handler(async ({ data: i }: { data: Omit<Instruction, "id"> }) => {
+    const { data, error } = await supabase
+      .from("instructions")
+      .insert([{
+        text: i.text,
+        category: i.category,
+        is_highlighted: i.isHighlighted,
+      }])
+      .select()
+      .single();
+
+    if (error) throw new Error(error.message);
+    return {
+      id: data.id,
+      text: data.text,
+      category: data.category,
+      isHighlighted: data.is_highlighted ?? false,
+    } as Instruction;
+  });
+
+export const updateInstruction = createServerFn({ method: "POST" })
+  .handler(async ({ data: { id, patch } }: { data: { id: string; patch: Partial<Instruction> } }) => {
+    const dbPatch: any = {};
+    if (patch.text !== undefined) dbPatch.text = patch.text;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.isHighlighted !== undefined) dbPatch.is_highlighted = patch.isHighlighted;
+
+    const { error } = await supabase
+      .from("instructions")
+      .update(dbPatch)
+      .eq("id", id);
+
+    if (error) throw new Error(error.message);
+    return { success: true };
+  });
+
+export const deleteInstruction = createServerFn({ method: "POST" })
+  .handler(async ({ data: id }: { data: string }) => {
+    const { error } = await supabase
+      .from("instructions")
       .delete()
       .eq("id", id);
 

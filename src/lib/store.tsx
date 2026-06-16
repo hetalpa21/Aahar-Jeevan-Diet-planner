@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import type { FoodItem, Patient, Plan, ProgressEntry } from "./types";
+import type { FoodItem, Patient, Plan, ProgressEntry, Instruction } from "./types";
 import { emptyPlan } from "./types";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -17,6 +17,10 @@ import {
   addProgressEntry as apiAddProgress,
   updateProgressEntry as apiUpdateProgress,
   deleteProgressEntry as apiDeleteProgress,
+  getInstructions,
+  addInstruction as apiAddInstruction,
+  updateInstruction as apiUpdateInstruction,
+  deleteInstruction as apiDeleteInstruction,
 } from "./api/database.functions";
 
 interface StoreCtx {
@@ -36,6 +40,10 @@ interface StoreCtx {
   addProgressEntry: (entry: Omit<ProgressEntry, "id" | "recordedAt">) => Promise<ProgressEntry>;
   updateProgressEntry: (id: string, patch: Partial<ProgressEntry>) => Promise<void>;
   deleteProgressEntry: (id: string, patientId: string) => Promise<void>;
+  instructions: Instruction[];
+  addInstruction: (i: Omit<Instruction, "id">) => Promise<Instruction>;
+  updateInstruction: (id: string, patch: Partial<Instruction>) => Promise<void>;
+  deleteInstruction: (id: string) => Promise<void>;
 }
 
 const Ctx = createContext<StoreCtx | null>(null);
@@ -52,6 +60,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const { data: foods = [], isLoading: loadingFoods } = useQuery({
     queryKey: ["foods"],
     queryFn: () => getFoods(),
+  });
+
+  const { data: instructionsData = [], isLoading: loadingInstructions } = useQuery({
+    queryKey: ["instructions"],
+    queryFn: () => getInstructions(),
   });
 
   // Mutations with optimistic updates
@@ -160,11 +173,51 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     mutationFn: (id: string) => apiDeleteProgress({ data: id }),
   });
 
+  const addInstructionMutation = useMutation({
+    mutationFn: (i: Omit<Instruction, "id">) => apiAddInstruction({ data: i }),
+    onSuccess: (newItem) => {
+      queryClient.setQueryData<Instruction[]>(["instructions"], (old = []) => [newItem, ...old]);
+    },
+  });
+
+  const updateInstructionMutation = useMutation({
+    mutationFn: (args: { id: string; patch: Partial<Instruction> }) =>
+      apiUpdateInstruction({ data: args }),
+    onMutate: async ({ id, patch }) => {
+      await queryClient.cancelQueries({ queryKey: ["instructions"] });
+      const prev = queryClient.getQueryData<Instruction[]>(["instructions"]);
+      queryClient.setQueryData<Instruction[]>(["instructions"], (old = []) =>
+        old.map((i) => (i.id === id ? { ...i, ...patch } : i)),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["instructions"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["instructions"] }),
+  });
+
+  const deleteInstructionMutation = useMutation({
+    mutationFn: (id: string) => apiDeleteInstruction({ data: id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["instructions"] });
+      const prev = queryClient.getQueryData<Instruction[]>(["instructions"]);
+      queryClient.setQueryData<Instruction[]>(["instructions"], (old = []) =>
+        old.filter((i) => i.id !== id),
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["instructions"], ctx.prev);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["instructions"] }),
+  });
+
   const value: StoreCtx = {
     patients,
     foods,
     plans: [],
-    loading: loadingPatients || loadingFoods,
+    loading: loadingPatients || loadingFoods || loadingInstructions,
     addPatient: async (p) => {
       return await addPatientMutation.mutateAsync(p);
     },
@@ -204,6 +257,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     deleteProgressEntry: async (id, patientId) => {
       await deleteProgressMutation.mutateAsync(id);
       queryClient.invalidateQueries({ queryKey: ["progress", patientId] });
+    },
+    instructions: instructionsData,
+    addInstruction: async (i) => {
+      return await addInstructionMutation.mutateAsync(i);
+    },
+    updateInstruction: async (id, patch) => {
+      await updateInstructionMutation.mutateAsync({ id, patch });
+    },
+    deleteInstruction: async (id) => {
+      await deleteInstructionMutation.mutateAsync(id);
     },
   };
 

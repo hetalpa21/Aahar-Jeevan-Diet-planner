@@ -89,6 +89,21 @@ export interface Plan {
   createdAt: string;
   updatedAt: string;
   meals: PlanDay[];
+  instructions?: PlanInstructions;
+}
+
+export type InstructionCategory = "Tip" | "Avoid" | "General";
+
+export interface Instruction {
+  id: string;
+  text: string;
+  category: InstructionCategory;
+  isHighlighted: boolean;
+}
+
+export interface PlanInstructions {
+  tips: string[];      // instruction IDs
+  avoidList: string[]; // instruction IDs
 }
 
 export function emptyPlan(patientId: string, patientName: string): Plan {

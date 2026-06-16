@@ -21,7 +21,12 @@ export function LoginScreen() {
     try {
       await login(password);
     } catch (err: any) {
-      setError("Incorrect password. Please try again.");
+      // If it's the specific "not configured" error, show that to help debugging
+      if (err.message?.includes("not configured")) {
+        setError("Error: " + err.message);
+      } else {
+        setError("Incorrect password. Please try again.");
+      }
     } finally {
       setLoading(false);
     }

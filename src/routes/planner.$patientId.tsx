@@ -13,6 +13,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
 import {
   DAYS,
@@ -24,12 +31,13 @@ import {
   type SlotName,
   type PaymentStatus,
 } from "@/lib/types";
-import { Home, Plus, Search, Trash2, Pencil, Copy, X, Printer, ArrowRight, ArrowLeft, CheckCircle2, IndianRupee, Check, Undo2, Redo2 } from "lucide-react";
+import type { Instruction, PlanInstructions } from "@/lib/types";
+import { Home, Plus, Search, Trash2, Pencil, Copy, X, Printer, ArrowRight, ArrowLeft, CheckCircle2, IndianRupee, Check, Undo2, Redo2, FileText, ListX } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
 import { FoodDialog } from "./catalogue";
 
-type PlannerStep = "planner" | "review";
+type PlannerStep = "planner" | "instructions" | "review";
 
 export const Route = createFileRoute("/planner/$patientId")({
   head: () => ({
@@ -261,8 +269,8 @@ function Planner() {
       const saved = await store.savePlan(next);
       setPlan(saved);
       setDirty(false);
-      setStep("review");
-      toast.success("Plan saved! Review payment & export.");
+      setStep("instructions");
+      toast.success("Plan saved! Now set instructions.");
     } catch (err: any) {
       toast.error("Failed to save plan: " + err.message);
     } finally {
@@ -337,8 +345,13 @@ function Planner() {
               Diet Plan
             </div>
             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "review" ? "bg-[var(--leaf-green)] text-white" : "bg-muted text-muted-foreground")}>
+            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "instructions" ? "bg-[var(--leaf-green)] text-white" : "bg-muted text-muted-foreground")}>
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">2</span>
+              Instructions
+            </div>
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "review" ? "bg-[var(--leaf-green)] text-white" : "bg-muted text-muted-foreground")}>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">3</span>
               Payment & Export
             </div>
           </div>
@@ -415,10 +428,19 @@ function Planner() {
                   {saving ? "Saving..." : <>Save & Next <ArrowRight className="ml-1 h-4 w-4" /></>}
                 </Button>
               </>
-            ) : (
+            ) : step === "instructions" ? (
               <>
                 <Button variant="outline" onClick={() => setStep("planner")}>
                   <ArrowLeft className="mr-1 h-4 w-4" />Back to Planner
+                </Button>
+                <Button onClick={() => setStep("review")}>
+                  Next <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setStep("instructions")}>
+                  <ArrowLeft className="mr-1 h-4 w-4" />Back to Instructions
                 </Button>
                 <Button onClick={exportPDF}>
                   <Printer className="mr-1 h-4 w-4" />Export to PDF
@@ -554,7 +576,18 @@ function Planner() {
         </>
       )}
 
-      {/* ====== STEP 2: Payment & Export Review ====== */}
+      {/* ====== STEP 2: Instructions ====== */}
+      {step === "instructions" && plan && (
+        <InstructionsStep
+          plan={plan}
+          store={store}
+          onUpdate={(instr) => {
+            update({ ...plan, instructions: instr });
+          }}
+        />
+      )}
+
+      {/* ====== STEP 3: Payment & Export Review ====== */}
       {step === "review" && (
         <ReviewStep
           patient={patient}
@@ -562,7 +595,7 @@ function Planner() {
           store={store}
           onPaymentUpdate={handlePaymentUpdate}
           onExportPDF={exportPDF}
-          onBack={() => setStep("planner")}
+          onBack={() => setStep("instructions")}
           onDone={goHome}
         />
       )}
@@ -631,40 +664,61 @@ function Planner() {
           <h2 className="text-center text-xl font-bold text-[#0070c0] mb-6 tracking-wide">TIPS:</h2>
           
           <ul className="list-disc pl-8 mb-10 space-y-2 text-[15px] marker:text-black">
-            <li className="text-[#c00000] font-bold marker:text-[#c00000]">
-              7 hrs. Sleep, Stress free life, Exercise help to live a happy and healthy life.
-            </li>
-            <li>
-              Vegetables include carrots, cucumber, green peppers, Broccoli, cauliflower, Cabbage, lettuce, mushrooms, onions, red peppers, tomatoes, beetroot, peas, celery, chili, garlic, basil, coriander, parsley, etc.
-            </li>
-            <li>
-              Drink at least 4 liters of water per day, (Make sure Urine color should be pale yellow).
-            </li>
-            <li>
-              Make sure don't consume more than the mentioned quantity.
-            </li>
-            <li>
-              Daily 45 mins any exercise (5 days in a week).
-            </li>
+            {(() => {
+              const tipIds = plan?.instructions?.tips ?? [];
+              const tipItems = tipIds.map((id) => store.instructions.find((i) => i.id === id)).filter(Boolean) as Instruction[];
+              if (tipItems.length > 0) {
+                return tipItems.map((tip) => (
+                  <li key={tip.id} className={tip.isHighlighted ? "text-[#c00000] font-bold marker:text-[#c00000]" : ""}>
+                    {tip.text}
+                  </li>
+                ));
+              }
+              // Fallback to hardcoded
+              return (
+                <>
+                  <li className="text-[#c00000] font-bold marker:text-[#c00000]">7 hrs. Sleep, Stress free life, Exercise help to live a happy and healthy life.</li>
+                  <li>Vegetables include carrots, cucumber, green peppers, Broccoli, cauliflower, Cabbage, lettuce, mushrooms, onions, red peppers, tomatoes, beetroot, peas, celery, chili, garlic, basil, coriander, parsley, etc.</li>
+                  <li>Drink at least 4 liters of water per day, (Make sure Urine color should be pale yellow).</li>
+                  <li>Make sure don't consume more than the mentioned quantity.</li>
+                  <li>Daily 45 mins any exercise (5 days in a week).</li>
+                </>
+              );
+            })()}
           </ul>
 
           <h2 className="text-2xl font-bold text-[#c00000] mb-6">Avoid List</h2>
           
           <div className="space-y-3 pl-2 text-[15px]">
-            <div className="text-[#c00000] font-bold">☐ Wheat, Sugar & Maida completely.</div>
-            <div className="text-[#c00000] font-bold">☐ Simple sugar, jaggery & honey</div>
-            <div className="text-[#c00000] font-bold">☐ Package food like chips, biscuits or any snacks</div>
-            
-            <div>☐ Home Fried food like puri, samosa, pakoda etc.</div>
-            <div>☐ Processed food & trans-fat.</div>
-            <div>☐ Pre made snacks like shukadi.....etc.</div>
-            <div>☐ Outside unhealthy snacks like panipuri, pav bhaji, pizza, burger etc.</div>
-            <div>☐ Bakery items like breads, cake, biscuits etc.</div>
-            <div>☐ Ice-cream, candy, Cold coco.</div>
-            <div>☐ Chocolates.</div>
-            <div>☐ Artificial sweeteners like ready fruits juice.</div>
-            <div>☐ Sugar sweetened beverages like soft drink, fruit drink, sports drinks etc.</div>
-            <div>☐ Alcoholic beverages like red bulls.</div>
+            {(() => {
+              const avoidIds = plan?.instructions?.avoidList ?? [];
+              const avoidItems = avoidIds.map((id) => store.instructions.find((i) => i.id === id)).filter(Boolean) as Instruction[];
+              if (avoidItems.length > 0) {
+                return avoidItems.map((item) => (
+                  <div key={item.id} className={item.isHighlighted ? "text-[#c00000] font-bold" : ""}>
+                    ☐ {item.text}
+                  </div>
+                ));
+              }
+              // Fallback to hardcoded
+              return (
+                <>
+                  <div className="text-[#c00000] font-bold">☐ Wheat, Sugar & Maida completely.</div>
+                  <div className="text-[#c00000] font-bold">☐ Simple sugar, jaggery & honey</div>
+                  <div className="text-[#c00000] font-bold">☐ Package food like chips, biscuits or any snacks</div>
+                  <div>☐ Home Fried food like puri, samosa, pakoda etc.</div>
+                  <div>☐ Processed food & trans-fat.</div>
+                  <div>☐ Pre made snacks like shukadi.....etc.</div>
+                  <div>☐ Outside unhealthy snacks like panipuri, pav bhaji, pizza, burger etc.</div>
+                  <div>☐ Bakery items like breads, cake, biscuits etc.</div>
+                  <div>☐ Ice-cream, candy, Cold coco.</div>
+                  <div>☐ Chocolates.</div>
+                  <div>☐ Artificial sweeteners like ready fruits juice.</div>
+                  <div>☐ Sugar sweetened beverages like soft drink, fruit drink, sports drinks etc.</div>
+                  <div>☐ Alcoholic beverages like red bulls.</div>
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -751,7 +805,323 @@ function fullDay(d: DayKey) {
 }
 
 /* ============================================================
-   STEP 2 — Payment & Export Review
+   STEP 2 — Instructions
+   ============================================================ */
+
+interface InstructionsStepProps {
+  plan: Plan;
+  store: ReturnType<typeof useStore>;
+  onUpdate: (instr: PlanInstructions) => void;
+}
+
+function InstructionsStep({ plan, store, onUpdate }: InstructionsStepProps) {
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState<"All" | "Tip" | "Avoid" | "General">("All");
+  const [editingInstr, setEditingInstr] = useState<Instruction | null>(null);
+  const [instrDialogOpen, setInstrDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Instruction | null>(null);
+
+  const instructions = plan.instructions ?? { tips: [], avoidList: [] };
+
+  const filtered = useMemo(() => {
+    return store.instructions.filter((i) => {
+      const matchQ = i.text.toLowerCase().includes(search.toLowerCase());
+      const matchC = catFilter === "All" || i.category === catFilter;
+      return matchQ && matchC;
+    });
+  }, [store.instructions, search, catFilter]);
+
+  function addToTips(id: string) {
+    if (instructions.tips.includes(id)) return;
+    onUpdate({ ...instructions, tips: [...instructions.tips, id] });
+  }
+
+  function addToAvoid(id: string) {
+    if (instructions.avoidList.includes(id)) return;
+    onUpdate({ ...instructions, avoidList: [...instructions.avoidList, id] });
+  }
+
+  function removeFromTips(id: string) {
+    onUpdate({ ...instructions, tips: instructions.tips.filter((x) => x !== id) });
+  }
+
+  function removeFromAvoid(id: string) {
+    onUpdate({ ...instructions, avoidList: instructions.avoidList.filter((x) => x !== id) });
+  }
+
+  const tipItems = instructions.tips.map((id) => store.instructions.find((i) => i.id === id)).filter(Boolean) as Instruction[];
+  const avoidItems = instructions.avoidList.map((id) => store.instructions.find((i) => i.id === id)).filter(Boolean) as Instruction[];
+
+  return (
+    <div className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[300px_1fr] print:hidden">
+      {/* Left: Instructions Catalogue */}
+      <aside className="rounded-xl border border-border bg-card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-foreground">Instructions Catalogue</h3>
+          <Button size="sm" variant="outline" onClick={() => { setEditingInstr(null); setInstrDialogOpen(true); }}>
+            <Plus className="mr-1 h-3 w-3" /> Add
+          </Button>
+        </div>
+
+        <div className="relative mb-3">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 text-sm h-8" />
+        </div>
+
+        <div className="mb-3 flex gap-1 flex-wrap">
+          {(["All", "Tip", "Avoid", "General"] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => setCatFilter(c)}
+              className={"rounded-md border px-2 py-0.5 text-[11px] font-medium transition " + (catFilter === c ? "border-[var(--leaf-green)] bg-[var(--leaf-green)] text-white" : "border-border bg-background text-muted-foreground hover:bg-muted")}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
+          {filtered.map((instr) => {
+            const inTips = instructions.tips.includes(instr.id);
+            const inAvoid = instructions.avoidList.includes(instr.id);
+            return (
+              <div key={instr.id} className="group rounded-lg border border-border bg-background p-2.5 text-xs">
+                <div className="flex items-start justify-between gap-1 mb-1.5">
+                  <span className={"rounded px-1.5 py-0.5 text-[10px] font-semibold " + (instr.category === "Tip" ? "bg-blue-100 text-blue-700" : instr.category === "Avoid" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700")}>
+                    {instr.category}
+                    {instr.isHighlighted && " ★"}
+                  </span>
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                    <button onClick={() => { setEditingInstr(instr); setInstrDialogOpen(true); }} className="rounded p-1 hover:bg-muted">
+                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                    <button onClick={() => setDeleteTarget(instr)} className="rounded p-1 hover:bg-destructive/10">
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </button>
+                  </div>
+                </div>
+                <p className="text-foreground leading-snug mb-2">{instr.text}</p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => addToTips(instr.id)}
+                    disabled={inTips}
+                    className={"rounded border px-2 py-0.5 text-[10px] font-medium transition " + (inTips ? "border-blue-300 bg-blue-50 text-blue-400 cursor-default" : "border-blue-300 bg-white text-blue-600 hover:bg-blue-50")}
+                  >
+                    {inTips ? "✓ In Tips" : "+ Tips"}
+                  </button>
+                  <button
+                    onClick={() => addToAvoid(instr.id)}
+                    disabled={inAvoid}
+                    className={"rounded border px-2 py-0.5 text-[10px] font-medium transition " + (inAvoid ? "border-red-300 bg-red-50 text-red-400 cursor-default" : "border-red-300 bg-white text-red-600 hover:bg-red-50")}
+                  >
+                    {inAvoid ? "✓ In Avoid" : "+ Avoid"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && (
+            <p className="py-6 text-center text-xs text-muted-foreground">No instructions found</p>
+          )}
+        </div>
+      </aside>
+
+      {/* Right: Tips & Avoid List */}
+      <div className="space-y-6">
+        {/* Tips section */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-[#0070c0]" />
+            <h3 className="text-lg font-bold text-[#0070c0]">Tips</h3>
+            <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">{tipItems.length}</span>
+          </div>
+          {tipItems.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No tips added yet. Add from the catalogue on the left.</p>
+          ) : (
+            <ul className="space-y-2">
+              {tipItems.map((tip, idx) => (
+                <li key={tip.id} className={"flex items-start gap-3 rounded-lg border border-border bg-background p-3 " + (tip.isHighlighted ? "border-l-4 border-l-[#c00000]" : "")}>
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{idx + 1}</span>
+                  <p className={"flex-1 text-sm " + (tip.isHighlighted ? "font-semibold text-[#c00000]" : "text-foreground")}>{tip.text}</p>
+                  <button onClick={() => removeFromTips(tip.id)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition">
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Avoid List section */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <ListX className="h-5 w-5 text-[#c00000]" />
+            <h3 className="text-lg font-bold text-[#c00000]">Avoid List</h3>
+            <span className="ml-auto rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">{avoidItems.length}</span>
+          </div>
+          {avoidItems.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">No avoid items added yet. Add from the catalogue on the left.</p>
+          ) : (
+            <ul className="space-y-2">
+              {avoidItems.map((item) => (
+                <li key={item.id} className={"flex items-start gap-3 rounded-lg border border-border bg-background p-3 " + (item.isHighlighted ? "border-l-4 border-l-[#c00000]" : "")}>
+                  <span className="mt-0.5 text-base">☐</span>
+                  <p className={"flex-1 text-sm " + (item.isHighlighted ? "font-bold text-[#c00000]" : "text-foreground")}>{item.text}</p>
+                  <button onClick={() => removeFromAvoid(item.id)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition">
+                    <X className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Instruction Dialog (Add/Edit) */}
+      <InstructionDialog
+        open={instrDialogOpen}
+        instruction={editingInstr}
+        onClose={() => { setInstrDialogOpen(false); setEditingInstr(null); }}
+        onSave={async (data) => {
+          try {
+            if (editingInstr) {
+              await store.updateInstruction(editingInstr.id, data);
+              toast.success("Instruction updated");
+            } else {
+              await store.addInstruction(data as Omit<Instruction, "id">);
+              toast.success("Instruction added");
+            }
+          } catch (err: any) {
+            toast.error("Failed: " + err.message);
+          }
+          setInstrDialogOpen(false);
+          setEditingInstr(null);
+        }}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Instruction?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this instruction? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (deleteTarget) {
+                  try {
+                    // Also remove from plan if present
+                    const newInstr = {
+                      tips: instructions.tips.filter((x) => x !== deleteTarget.id),
+                      avoidList: instructions.avoidList.filter((x) => x !== deleteTarget.id),
+                    };
+                    onUpdate(newInstr);
+                    await store.deleteInstruction(deleteTarget.id);
+                    toast.success("Instruction deleted");
+                  } catch (err: any) {
+                    toast.error("Failed: " + err.message);
+                  } finally {
+                    setDeleteTarget(null);
+                  }
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+/* Instruction Dialog — Add / Edit */
+function InstructionDialog({
+  open, instruction, onClose, onSave,
+}: {
+  open: boolean;
+  instruction: Instruction | null;
+  onClose: () => void;
+  onSave: (data: Omit<Instruction, "id">) => void;
+}) {
+  const [text, setText] = useState("");
+  const [category, setCategory] = useState<"Tip" | "Avoid" | "General">("General");
+  const [isHighlighted, setIsHighlighted] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setText(instruction?.text ?? "");
+      setCategory(instruction?.category ?? "General");
+      setIsHighlighted(instruction?.isHighlighted ?? false);
+    }
+  }, [open, instruction]);
+
+  function submit() {
+    if (!text.trim()) { toast.error("Text is required"); return; }
+    onSave({ text: text.trim(), category, isHighlighted });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{instruction ? "Edit Instruction" : "Add Instruction"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div>
+            <Label>Text</Label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              placeholder="Enter instruction text..."
+            />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <Label>Category</Label>
+              <div className="mt-1 flex gap-1.5">
+                {(["Tip", "Avoid", "General"] as const).map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setCategory(c)}
+                    className={"rounded-md border px-3 py-1.5 text-xs font-medium transition " + (category === c ? "border-[var(--leaf-green)] bg-[var(--leaf-green)] text-white" : "border-border bg-background hover:bg-muted")}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Highlight</Label>
+              <div className="mt-1">
+                <button
+                  onClick={() => setIsHighlighted(!isHighlighted)}
+                  className={"rounded-md border px-3 py-1.5 text-xs font-medium transition " + (isHighlighted ? "border-[#c00000] bg-[#c00000]/10 text-[#c00000]" : "border-border bg-background hover:bg-muted")}
+                >
+                  {isHighlighted ? "★ Bold/Red" : "Normal"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit}>{instruction ? "Update" : "Add"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ============================================================
+   STEP 3 — Payment & Export Review
    ============================================================ */
 
 const PAYMENT_OPTIONS: { value: PaymentStatus; label: string; color: string; icon: typeof CheckCircle2 }[] = [
