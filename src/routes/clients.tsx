@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
+import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +23,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useStore } from "@/lib/store";
-import type { Patient, PaymentStatus, Gender } from "@/lib/types";
-import { Search, Pencil, Trash2, TrendingUp } from "lucide-react";
+import type { Patient, PaymentStatus, Gender, PlanStatus } from "@/lib/types";
+import type { Instruction, PlanInstructions } from "@/lib/types";
+import { getPlanStatus, getPlanRemainingText } from "@/lib/types";
+import { Plus, Search, Trash2, Pencil, TrendingUp, UserPlus, Ban } from "lucide-react";
 import { toast } from "sonner";
+import { getInitials, getThemeForName, toTitleCase } from "@/lib/utils";
 
 export const Route = createFileRoute("/clients")({
   head: () => ({
@@ -53,6 +56,15 @@ function ClientList() {
   // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<Patient | null>(null);
 
+  // Extend dialog
+  const [extendPatient, setExtendPatient] = useState<Patient | null>(null);
+
+  // Terminate dialog
+  const [terminateTarget, setTerminateTarget] = useState<Patient | null>(null);
+  const [extendDuration, setExtendDuration] = useState<number | null>(null);
+  const [customExtend, setCustomExtend] = useState("");
+  const effectiveExtend = extendDuration === -1 ? (Number(customExtend) || 0) : (extendDuration ?? 0);
+
   const rows = useMemo(() => {
     let list = patients.filter((p) =>
       (p.name + " " + p.contact).toLowerCase().includes(q.toLowerCase()),
@@ -78,30 +90,32 @@ function ClientList() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="flex min-h-screen bg-[#faf9f7]">
+      <AppSidebar />
+      <main className="ml-[72px] flex-1 px-8 py-8 sm:px-12 lg:px-16 max-w-[1400px]">
         <div className="mb-6 flex items-end justify-between gap-4">
-          <h1 className="text-3xl font-bold text-[var(--dark-green)]">Client List</h1>
-          <Button onClick={() => navigate({ to: "/" })}>Add Patient</Button>
+          <h1 className="text-3xl font-bold text-[#1a1a1a]">Client list</h1>
+          <Button onClick={() => navigate({ to: "/" })} className="rounded-full bg-[var(--primary-orange)] px-6 hover:bg-[var(--primary-orange)]/90">
+            <UserPlus className="mr-2 h-4 w-4" /> Add patient
+          </Button>
         </div>
 
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative max-w-md flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative max-w-2xl flex-1">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by name or phone"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              className="pl-9"
+              className="rounded-full border-[#e8e5e1] bg-white pl-11 shadow-sm h-11"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">Sort by</span>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="text-[#8a8580] font-medium">Sort by</span>
             <select
               value={sort}
               onChange={(e) => setSort(e.target.value as "name" | "date")}
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="rounded-full border border-[#e8e5e1] bg-white px-4 py-2.5 text-sm font-medium text-[#1a1a1a] shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary-orange)]"
             >
               <option value="name">Name</option>
               <option value="date">Last plan date</option>
@@ -109,17 +123,17 @@ function ClientList() {
           </div>
         </div>
 
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground">Payment Status</span>
+        <div className="mb-8 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-medium text-[#8a8580] mr-2">Payment status</span>
           {STATUS_FILTERS.map((s) => (
             <button
               key={s}
               onClick={() => setStatus(s)}
               className={
-                "rounded-full px-3 py-1 text-sm transition " +
+                "rounded-full px-5 py-1.5 text-sm font-medium transition " +
                 (status === s
-                  ? "bg-[var(--dark-green)] text-white"
-                  : "bg-muted text-foreground hover:bg-muted/70")
+                  ? "bg-[#00361a] text-white"
+                  : "bg-[#f0eeeb] text-[#1a1a1a] hover:bg-[#e8e5e1]")
               }
             >
               {s}
@@ -127,88 +141,95 @@ function ClientList() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Name</th>
-                  <th className="px-4 py-3 font-medium">Age</th>
-                  <th className="px-4 py-3 font-medium">Current</th>
-                  <th className="px-4 py-3 font-medium">Last plan</th>
-                  <th className="px-4 py-3 font-medium">Payment</th>
-                  <th className="px-4 py-3 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => (
-                  <tr key={p.id} className="border-t border-border align-middle">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary-orange)]/20 font-semibold text-[var(--accent-orange)]">
-                          {p.name[0]}
-                        </div>
-                        <div>
-                          <div className="font-medium text-foreground">{p.name}</div>
-                          <div className="text-xs text-muted-foreground">{p.contact}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{p.age}</td>
-                    <td className="px-4 py-3">{p.currentWeight} kg</td>
-                    <td className="px-4 py-3">{p.lastPlanDate ?? "—"}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <StatusBadge status={p.paymentStatus} />
-                        {p.totalAmount ? (
-                          <span className="text-xs text-muted-foreground">
-                            {p.paymentStatus === "Partial" ? `₹${(p.amountReceived ?? 0).toLocaleString("en-IN")}/` : ""}
-                            ₹{p.totalAmount.toLocaleString("en-IN")}
-                          </span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          to="/planner/$patientId"
-                          params={{ patientId: p.id }}
-                          className="rounded-md px-2.5 py-1.5 text-sm font-medium text-[var(--accent-orange)] transition hover:bg-[var(--primary-orange)]/10"
-                        >
-                          Edit Plan
-                        </Link>
-                        <Link
-                          to="/progress/$patientId"
-                          params={{ patientId: p.id }}
-                          className="flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-medium text-[var(--leaf-green)] transition hover:bg-[var(--leaf-green)]/10"
-                        >
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          Progress
-                        </Link>
-                        <button
-                          onClick={() => setEditPatient(p)}
-                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                          aria-label="Edit details"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => setDeleteTarget(p)}
-                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-                          aria-label="Delete patient"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No clients match your filters.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="flex flex-col gap-4">
+          {rows.map((p) => {
+            const theme = getThemeForName(p.name);
+            const pStatus = getPlanStatus(p);
+            return (
+              <div key={p.id} className={`flex items-center justify-between rounded-2xl border-l-4 border-y border-r border-y-[#e8e5e1] border-r-[#e8e5e1] bg-white p-4 py-5 shadow-sm transition-all hover:shadow-md ${theme.border}`}>
+                <div className="flex items-center gap-5">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold ${theme.bg} ${theme.text}`}>
+                    {getInitials(p.name)}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[15px] font-bold text-[#1a1a1a]">{toTitleCase(p.name)}</span>
+                      
+                      {/* Payment Badge */}
+                      {p.paymentStatus === "Pending" && <span className="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">Pending · ₹{p.totalAmount?.toLocaleString("en-IN") || 0}</span>}
+                      {p.paymentStatus === "Done" && <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">Done</span>}
+                      {p.paymentStatus === "Partial" && <span className="rounded-full bg-[#f0eeeb] px-2.5 py-0.5 text-xs font-semibold text-[#1a1a1a]">Partial · ₹{p.amountReceived?.toLocaleString("en-IN") || 0}</span>}
+                      {p.paymentStatus === "None" && <span className="rounded-full bg-[#f0eeeb] px-2.5 py-0.5 text-xs font-semibold text-[#8a8580]">No Payment</span>}
+
+                      {/* Plan Status Badge */}
+                      {pStatus === "On Track" && <span className="rounded-full bg-[#00361a] px-2.5 py-0.5 text-xs font-semibold text-white">On Track · {getPlanRemainingText(p)}</span>}
+                      {pStatus === "Completed" && <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">Completed</span>}
+                      {pStatus === "Terminated" && <span className="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-semibold text-stone-600">Terminated</span>}
+                      {pStatus === "No Plan" && <span className="rounded-full bg-[#f0eeeb] px-2.5 py-0.5 text-xs font-semibold text-[#8a8580]">No Plan</span>}
+                    </div>
+                    <div className="flex items-center gap-2 text-[13px] font-medium text-[#8a8580]">
+                      <span>• {p.contact || "No contact"}</span>
+                      <span>{p.age} yrs</span>
+                      <span>{p.currentWeight} kg</span>
+                      <span>Last plan · {p.lastPlanDate ?? "—"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <Link
+                    to="/planner/$patientId"
+                    params={{ patientId: p.id }}
+                    className="rounded-full bg-[#f0eeeb] px-4 py-2 text-[13px] font-bold text-[#1a1a1a] transition hover:bg-[#e8e5e1]"
+                  >
+                    Edit plan
+                  </Link>
+                  <Link
+                    to="/progress/$patientId"
+                    params={{ patientId: p.id }}
+                    className="flex items-center gap-1.5 rounded-full bg-[#e6f4f1] px-4 py-2 text-[13px] font-bold text-[#006b50] transition hover:bg-[#d1eae5]"
+                  >
+                    <TrendingUp className="h-3.5 w-3.5" /> Progress
+                  </Link>
+                  {(pStatus === "Completed" || pStatus === "No Plan" || pStatus === "Terminated") && (
+                    <button
+                      onClick={() => { setExtendPatient(p); setExtendDuration(null); setCustomExtend(""); }}
+                      className="flex items-center gap-1.5 rounded-full bg-orange-50 px-4 py-2 text-[13px] font-bold text-orange-700 transition hover:bg-orange-100"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> {pStatus === "No Plan" ? "Set Duration" : "Extend"}
+                    </button>
+                  )}
+                  {pStatus === "On Track" && (
+                    <button
+                      onClick={() => setTerminateTarget(p)}
+                      className="flex items-center gap-1.5 rounded-full bg-stone-100 px-4 py-2 text-[13px] font-bold text-stone-600 transition hover:bg-stone-200"
+                    >
+                      <Ban className="h-3.5 w-3.5" /> Terminate
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setEditPatient(p)}
+                    className="rounded-full p-2 text-[#8a8580] transition hover:bg-[#f0eeeb] hover:text-[#1a1a1a]"
+                    aria-label="Edit details"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setDeleteTarget(p)}
+                    className="rounded-full p-2 text-[#8a8580] transition hover:bg-red-50 hover:text-red-600"
+                    aria-label="Delete patient"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {rows.length === 0 && (
+            <div className="rounded-2xl border border-[#e8e5e1] bg-white p-10 text-center text-[#8a8580]">
+              No clients match your filters.
+            </div>
+          )}
         </div>
       </main>
 
@@ -233,7 +254,7 @@ function ClientList() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle>
+            <AlertDialogTitle>Delete {toTitleCase(deleteTarget?.name || "")}?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently remove this patient and all their associated plans and progress data. This action cannot be undone.
             </AlertDialogDescription>
@@ -246,6 +267,92 @@ function ClientList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Terminate Confirmation */}
+      <AlertDialog open={!!terminateTarget} onOpenChange={(o) => !o && setTerminateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Terminate plan for {toTitleCase(terminateTarget?.name || "")}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop the current plan immediately and mark the patient's status as Terminated. They will no longer be considered active.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!terminateTarget) return;
+                try {
+                  const today = new Date();
+                  await store.updatePatient(terminateTarget.id, {
+                    isTerminated: true,
+                    planEndDate: today.toISOString(),
+                  });
+                  toast.success("Plan terminated");
+                  setTerminateTarget(null);
+                } catch (err: any) {
+                  toast.error("Failed to terminate plan: " + err.message);
+                }
+              }}
+              className="bg-stone-600 text-white hover:bg-stone-700"
+            >
+              Terminate Plan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ══════ EXTEND DIALOG ══════ */}
+      <Dialog open={!!extendPatient} onOpenChange={(o) => { if (!o) setExtendPatient(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>{extendPatient && getPlanStatus(extendPatient) === "No Plan" ? "Set Plan Duration" : "Extend Plan"}: {toTitleCase(extendPatient?.name || "")}</DialogTitle></DialogHeader>
+          <div className="py-2">
+            <Label className="mb-3 block text-sm font-semibold text-[#00361a]">{extendPatient && getPlanStatus(extendPatient) === "No Plan" ? "Set Duration To" : "Extend Duration By"}</Label>
+            <div className="flex flex-wrap gap-2">
+              {[1, 3, 5].map((m) => (
+                <button key={m} type="button" onClick={() => { setExtendDuration(m); setCustomExtend(""); }}
+                  className={"rounded-md border px-4 py-2 text-sm font-medium transition " + (extendDuration === m ? "border-[#00361a] bg-[#00361a] text-white" : "border-input bg-background text-foreground hover:bg-muted")}
+                >{m} month{m > 1 ? "s" : ""}</button>
+              ))}
+              <button type="button" onClick={() => setExtendDuration(-1)}
+                className={"rounded-md border px-4 py-2 text-sm font-medium transition " + (extendDuration === -1 ? "border-[#00361a] bg-[#00361a] text-white" : "border-input bg-background text-foreground hover:bg-muted")}
+              >Custom</button>
+            </div>
+            {extendDuration === -1 && (
+              <div className="mt-3 flex items-center gap-2">
+                <Input type="number" min="1" placeholder="Enter months" value={customExtend} onChange={(e) => setCustomExtend(e.target.value)} className="w-32" />
+                <span className="text-sm text-muted-foreground">months</span>
+              </div>
+            )}
+            {effectiveExtend > 0 && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                New plan will run from <span className="font-semibold text-[#00361a]">{new Date().toLocaleDateString()}</span> to <span className="font-semibold text-[#00361a]">{(() => { const d = new Date(); d.setMonth(d.getMonth() + effectiveExtend); return d.toLocaleDateString(); })()}</span>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtendPatient(null)}>Cancel</Button>
+            <Button className="bg-[#00361a] hover:bg-[#1b4d2e]" disabled={effectiveExtend <= 0} onClick={async () => {
+              if (extendPatient && effectiveExtend > 0) {
+                const today = new Date();
+                const startDate = today.toISOString().split("T")[0];
+                const end = new Date(today);
+                end.setMonth(end.getMonth() + effectiveExtend);
+                const endDate = end.toISOString().split("T")[0];
+                try {
+                  await store.updatePatient(extendPatient.id, {
+                    planStartDate: startDate,
+                    planDurationMonths: effectiveExtend,
+                    planEndDate: endDate,
+                  });
+                  toast.success(`Extended plan for ${extendPatient.name} by ${effectiveExtend} months`);
+                  setExtendPatient(null);
+                } catch (e: any) { toast.error("Failed to extend plan: " + e.message); }
+              }
+            }}>Confirm Extension</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -258,6 +365,14 @@ function StatusBadge({ status }: { status: PaymentStatus }) {
         ? "bg-[var(--primary-orange)] text-white"
         : "bg-[var(--leaf-green)] text-white";
   return <Badge className={"rounded-full px-3 py-1 " + cls}>{status}</Badge>;
+}
+
+function PlanStatusBadge({ status }: { status: PlanStatus }) {
+  const cls =
+    status === "On Track" ? "bg-[var(--dark-green)] text-white" :
+    status === "Completed" ? "bg-muted text-muted-foreground" :
+    "bg-muted/50 text-muted-foreground/50";
+  return <Badge className={"rounded-full px-3 py-1 font-medium shadow-none " + cls}>{status}</Badge>;
 }
 
 /* ============================================================
@@ -298,7 +413,7 @@ function EditPatientDialog({
       return;
     }
     onSave({
-      name: form.name.trim(),
+      name: toTitleCase(form.name.trim()),
       age: Number(form.age) || 0,
       contact: form.contact,
       currentWeight: Number(form.currentWeight) || 0,
@@ -317,7 +432,7 @@ function EditPatientDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Edit Patient — {patient.name}</DialogTitle>
+          <DialogTitle>Edit Patient — {toTitleCase(patient.name)}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4">
           <Field label="Name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>

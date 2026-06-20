@@ -34,6 +34,10 @@ export const getPatients = createServerFn({ method: "GET" }).handler(async () =>
     amountReceived: row.amount_received ? Number(row.amount_received) : undefined,
     lastPlanDate: row.last_plan_date || undefined,
     notes: row.notes || undefined,
+    planStartDate: row.plan_start_date || undefined,
+    planDurationMonths: row.plan_duration_months ? Number(row.plan_duration_months) : undefined,
+    planEndDate: row.plan_end_date || undefined,
+    createdAt: row.created_at || new Date(0).toISOString(),
   })) as Patient[];
 });
 
@@ -58,6 +62,9 @@ export const addPatient = createServerFn({ method: "POST" })
         total_amount: p.totalAmount || null,
         amount_received: p.amountReceived || null,
         notes: p.notes,
+        plan_start_date: p.planStartDate || null,
+        plan_duration_months: p.planDurationMonths || null,
+        plan_end_date: p.planEndDate || null,
       }])
       .select()
       .single();
@@ -82,6 +89,10 @@ export const addPatient = createServerFn({ method: "POST" })
       amountReceived: data.amount_received ? Number(data.amount_received) : undefined,
       lastPlanDate: data.last_plan_date || undefined,
       notes: data.notes || undefined,
+      planStartDate: data.plan_start_date || undefined,
+      planDurationMonths: data.plan_duration_months ? Number(data.plan_duration_months) : undefined,
+      planEndDate: data.plan_end_date || undefined,
+      createdAt: data.created_at || new Date().toISOString(),
     } as Patient;
   });
 
@@ -105,6 +116,9 @@ export const updatePatient = createServerFn({ method: "POST" })
     if (patch.amountReceived !== undefined) dbPatch.amount_received = patch.amountReceived;
     if (patch.notes !== undefined) dbPatch.notes = patch.notes;
     if (patch.lastPlanDate !== undefined) dbPatch.last_plan_date = patch.lastPlanDate;
+    if (patch.planStartDate !== undefined) dbPatch.plan_start_date = patch.planStartDate;
+    if (patch.planDurationMonths !== undefined) dbPatch.plan_duration_months = patch.planDurationMonths;
+    if (patch.planEndDate !== undefined) dbPatch.plan_end_date = patch.planEndDate;
 
     dbPatch.updated_at = new Date().toISOString();
 
@@ -467,4 +481,23 @@ export const deleteInstruction = createServerFn({ method: "POST" })
 
     if (error) throw new Error(error.message);
     return { success: true };
+  });
+
+// ── Dashboard Stats ──────────────────────────────────────────────────
+export const getDashboardStats = createServerFn({ method: "GET" })
+  .handler(async () => {
+    const { count: totalPlans, error: e1 } = await supabase
+      .from("plans")
+      .select("*", { count: "exact", head: true });
+
+    if (e1) throw new Error(e1.message);
+
+    const { count: activePlans, error: e2 } = await supabase
+      .from("plans")
+      .select("*", { count: "exact", head: true })
+      .eq("is_draft", false);
+
+    if (e2) throw new Error(e2.message);
+
+    return { totalPlans: totalPlans ?? 0, activePlans: activePlans ?? 0 };
   });

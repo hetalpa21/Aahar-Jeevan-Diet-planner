@@ -156,6 +156,23 @@
 @media print {
   @page { size: A4; margin: 14mm; }
   body { background: white !important; }
+  
+  /* Aggressively hide UI elements that shouldn't print */
+  .print\:hidden,
+  [data-sonner-toaster],
+  [role="dialog"] {
+    display: none !important;
+  }
+  
+  /* Reset global layouts that cause blank pages in some browsers */
+  html, body, #root {
+    height: auto !important;
+    min-height: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 }
 
 .print-export { color: #1a1a1a; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
@@ -183,15 +200,17 @@
   border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 8px 0;
 }
 
-.print-day { margin-bottom: 14px; break-inside: avoid; page-break-inside: avoid; }
+.print-day { margin-bottom: 14px; }
 .print-day-title {
   font-size: 14px; font-weight: 700; color: white;
   background: var(--leaf-green, #2e7d32);
   padding: 4px 10px; border-radius: 4px 4px 0 0; margin: 0;
+  break-inside: avoid; break-after: avoid;
 }
 .print-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .print-table th, .print-table td { border: 1px solid #d4d4d4; padding: 6px 8px; text-align: left; vertical-align: top; }
 .print-table th { background: #f3f4f6; font-weight: 600; color: #333; }
+.print-table tr { break-inside: avoid; }
 .print-slot { font-weight: 600; color: var(--dark-green, #1f5132); }
 .print-items { margin: 0; padding-left: 16px; }
 .print-items li { margin-bottom: 2px; }

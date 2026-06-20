@@ -21,6 +21,41 @@ export interface Patient {
   lowerWaist?: number;
   thigh?: number;
   bmi?: number;
+  planStartDate?: string;
+  planDurationMonths?: number;
+  planEndDate?: string;
+  isTerminated?: boolean;
+  createdAt?: string;
+}
+
+export type PlanStatus = "On Track" | "Completed" | "No Plan" | "Terminated";
+
+export function getPlanStatus(patient: Patient): PlanStatus {
+  if (patient.isTerminated) return "Terminated";
+  if (!patient.planStartDate || !patient.planEndDate) return "No Plan";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(patient.planEndDate);
+  end.setHours(0, 0, 0, 0);
+  return today <= end ? "On Track" : "Completed";
+}
+
+export function getPlanRemainingText(patient: Patient): string {
+  if (patient.isTerminated) return "Terminated";
+  if (!patient.planEndDate) return "";
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(patient.planEndDate);
+  end.setHours(0, 0, 0, 0);
+  const diffMs = end.getTime() - today.getTime();
+  if (diffMs < 0) return "Plan ended";
+  if (diffMs === 0) return "Last day";
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays < 30) return `${diffDays} day${diffDays !== 1 ? "s" : ""} left`;
+  const months = Math.floor(diffDays / 30);
+  const days = diffDays % 30;
+  if (days === 0) return `${months} month${months !== 1 ? "s" : ""} left`;
+  return `${months}m ${days}d left`;
 }
 
 export interface ProgressEntry {
@@ -53,18 +88,24 @@ export const DAYS: DayKey[] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export type SlotName = string;
 export const DEFAULT_SLOTS: string[] = [
   "Early Morning",
+  "After 1 Hour",
+  "Workout",
   "Breakfast",
   "Lunch",
-  "Evening Snack",
+  "Evening",
   "Dinner",
+  "Bedtime",
 ];
 export const SLOTS = DEFAULT_SLOTS; // backward compat alias
 export const DEFAULT_TIMES: Record<string, string> = {
-  "Early Morning": "06:30",
-  Breakfast: "08:00",
+  "Early Morning": "06:00",
+  "After 1 Hour": "07:00",
+  Workout: "07:30",
+  Breakfast: "08:30",
   Lunch: "13:00",
-  "Evening Snack": "16:30",
+  Evening: "16:30",
   Dinner: "19:30",
+  Bedtime: "21:30",
 };
 
 export interface PlanItem {

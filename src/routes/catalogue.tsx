@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { AppHeader } from "@/components/AppHeader";
+import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,9 +42,9 @@ function Catalogue() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppHeader />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+    <div className="flex min-h-screen bg-[#faf9f7]">
+      <AppSidebar />
+      <main className="ml-[72px] flex-1 mx-auto max-w-7xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-[var(--dark-green)]">Food Catalogue</h1>
           <Button onClick={openNew}><Plus className="mr-1 h-4 w-4" /> Add New Item</Button>

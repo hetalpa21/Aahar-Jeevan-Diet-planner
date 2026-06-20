@@ -32,14 +32,20 @@ import {
   type PaymentStatus,
 } from "@/lib/types";
 import type { Instruction, PlanInstructions } from "@/lib/types";
-import { Home, Plus, Search, Trash2, Pencil, Copy, X, Printer, ArrowRight, ArrowLeft, CheckCircle2, IndianRupee, Check, Undo2, Redo2, FileText, ListX } from "lucide-react";
+import { Home, Plus, Search, Trash2, Pencil, Copy, X, Printer, ArrowRight, ArrowLeft, CheckCircle2, IndianRupee, Check, Undo2, Redo2, FileText, ListX, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
+import { AppSidebar } from "@/components/AppSidebar";
 import { FoodDialog } from "./catalogue";
+import { useAuth } from "@/lib/useAuth";
 
 type PlannerStep = "planner" | "instructions" | "review";
+const VALID_STEPS: PlannerStep[] = ["planner", "instructions", "review"];
 
 export const Route = createFileRoute("/planner/$patientId")({
+  validateSearch: (search: Record<string, unknown>): { step: PlannerStep } => ({
+    step: VALID_STEPS.includes(search.step as PlannerStep) ? (search.step as PlannerStep) : "planner",
+  }),
   head: () => ({
     meta: [
       { title: "Diet Planner — Aahar Jeevan" },
@@ -62,7 +68,10 @@ function Planner() {
   const [day, setDay] = useState<DayKey>("Mon");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<string>("All");
-  const [step, setStep] = useState<PlannerStep>("planner");
+  const { step } = Route.useSearch();
+  const setStep = useCallback((s: PlannerStep) => {
+    navigate({ search: { step: s }, replace: true });
+  }, [navigate]);
   const [saving, setSaving] = useState(false);
   const [deleteFoodTarget, setDeleteFoodTarget] = useState<FoodItem | null>(null);
   const [copyPopover, setCopyPopover] = useState(false);
@@ -84,6 +93,18 @@ function Planner() {
     loadPlan();
   }, [patientId, store.patients.length]);
 
+  // Track recently viewed for dashboard
+  useEffect(() => {
+    if (!patient) return;
+    const key = "aahar_recently_viewed";
+    try {
+      const existing = JSON.parse(localStorage.getItem(key) || "[]");
+      const filtered = existing.filter((e: any) => e.patientId !== patient.id);
+      filtered.unshift({ patientId: patient.id, name: patient.name, viewedAt: new Date().toISOString() });
+      localStorage.setItem(key, JSON.stringify(filtered.slice(0, 10)));
+    } catch {}
+  }, [patient]);
+
   const currentDay = plan?.meals.find((m) => m.day === day);
   const categories = useMemo(() => {
     const set = new Set(store.foods.map((f) => f.category ?? "Other"));
@@ -94,7 +115,7 @@ function Planner() {
       const matchQ = f.name.toLowerCase().includes(search.toLowerCase());
       const matchC = category === "All" || (f.category ?? "Other") === category;
       return matchQ && matchC;
-    });
+    }).slice(0, 6);
   }, [store.foods, search, category]);
 
   // Undo / Redo history
@@ -245,6 +266,24 @@ function Planner() {
     setCopyTargets([]);
   }
 
+  // ── Debounced auto-save: persist to Supabase 1.5s after last change ──
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!dirty || !plan) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      try {
+        const next = { ...plan, updatedAt: new Date().toISOString() };
+        const saved = await store.savePlan(next);
+        setPlan(saved);
+        setDirty(false);
+      } catch {
+        // silent – manual save still available as fallback
+      }
+    }, 1500);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [dirty, plan]);
+
   async function save(asDraft: boolean) {
     if (!plan) return;
     const next = { ...plan, isDraft: asDraft, updatedAt: new Date().toISOString() };
@@ -316,55 +355,39 @@ function Planner() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Planner header */}
-      <header className="sticky top-0 z-30 border-b border-border bg-[var(--header-bg)]/95 backdrop-blur-md shadow-sm print:hidden">
-        <div className="mx-auto flex h-[68px] max-w-[1600px] items-center justify-between gap-4 px-5 sm:px-8">
-          <button onClick={goHome} className="flex items-center gap-3 group rounded-lg px-2.5 py-1.5 text-[var(--dark-green)] transition hover:bg-muted">
-            <img
-              src={logo}
-              alt=""
-              width={44}
-              height={44}
-              className="h-11 w-11 rounded-xl object-contain shadow-sm ring-1 ring-border/50 transition group-hover:shadow-md group-hover:scale-[1.04]"
-            />
-            <div className="hidden sm:block text-left">
-              <div className="text-sm font-bold leading-tight text-[var(--dark-green)]">Aahar Jeevan</div>
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Home className="h-3 w-3" />
-                Home
-              </div>
-            </div>
-            <Home className="h-4 w-4 sm:hidden" />
-          </button>
-
+    <div className="flex min-h-screen bg-[#faf9f7] print:block print:bg-white print:min-h-0">
+      <AppSidebar />
+      <main className="ml-[72px] flex-1 flex flex-col min-h-screen pb-20 print:block print:ml-0 print:pb-0 print:min-h-0">
+        {/* Top bar with step indicator and actions */}
+        <div className="sticky top-0 z-30 flex items-center justify-between border-b border-[#e8e5e1] bg-white/95 px-6 py-4 backdrop-blur-md shadow-sm print:hidden">
+          
           {/* Step indicator */}
           <div className="hidden items-center gap-2 sm:flex">
-            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "planner" ? "bg-[var(--leaf-green)] text-white" : "bg-muted text-muted-foreground")}>
+            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "planner" ? "bg-[#1b4d2e] text-white shadow-sm" : "bg-[#f0eeeb] text-[#8a8580]")}>
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">1</span>
               Diet Plan
             </div>
-            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "instructions" ? "bg-[var(--leaf-green)] text-white" : "bg-muted text-muted-foreground")}>
+            <ArrowRight className="h-3.5 w-3.5 text-[#b5b0ab]" />
+            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "instructions" ? "bg-[#1b4d2e] text-white shadow-sm" : "bg-[#f0eeeb] text-[#8a8580]")}>
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">2</span>
               Instructions
             </div>
-            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "review" ? "bg-[var(--leaf-green)] text-white" : "bg-muted text-muted-foreground")}>
+            <ArrowRight className="h-3.5 w-3.5 text-[#b5b0ab]" />
+            <div className={"flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition " + (step === "review" ? "bg-[#1b4d2e] text-white shadow-sm" : "bg-[#f0eeeb] text-[#8a8580]")}>
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px]">3</span>
               Payment & Export
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {step === "planner" ? (
               <>
-                <div className="flex items-center gap-1 mr-1">
+                <div className="hidden items-center gap-1 mr-2 md:flex">
                   <button
                     onClick={undo}
                     disabled={historyLen === 0}
                     title="Undo (Ctrl+Z)"
-                    className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted disabled:opacity-30 disabled:pointer-events-none"
+                    className="rounded-full p-2 text-[#8a8580] transition hover:bg-[#f0eeeb] disabled:opacity-30 disabled:pointer-events-none"
                   >
                     <Undo2 className="h-4 w-4" />
                   </button>
@@ -372,22 +395,22 @@ function Planner() {
                     onClick={redo}
                     disabled={futureLen === 0}
                     title="Redo (Ctrl+Y)"
-                    className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted disabled:opacity-30 disabled:pointer-events-none"
+                    className="rounded-full p-2 text-[#8a8580] transition hover:bg-[#f0eeeb] disabled:opacity-30 disabled:pointer-events-none"
                   >
                     <Redo2 className="h-4 w-4" />
                   </button>
                 </div>
-                <Button variant="outline" onClick={() => save(true)} disabled={saving}>
+                <Button variant="outline" onClick={() => save(true)} disabled={saving} className="rounded-full border border-[#e8e5e1] bg-white px-5 font-bold text-[#1a1a1a] shadow-sm hover:bg-[#f0eeeb]">
                   {saving ? "Saving..." : "Save as Draft"}
                 </Button>
                 <div className="relative">
-                  <Button variant="outline" onClick={() => { setCopyPopover(!copyPopover); setCopyTargets([]); }}>
-                    <Copy className="mr-1 h-4 w-4" />Duplicate Day
+                  <Button variant="outline" onClick={() => { setCopyPopover(!copyPopover); setCopyTargets([]); }} className="rounded-full border border-[#e8e5e1] bg-white px-5 font-bold text-[#1a1a1a] shadow-sm hover:bg-[#f0eeeb]">
+                    <Copy className="mr-1.5 h-4 w-4" />Duplicate Day
                   </Button>
                   {copyPopover && (
-                    <div className="absolute right-0 top-full z-30 mt-1 w-60 rounded-xl border border-border bg-card p-3 shadow-xl">
-                      <p className="mb-2 text-xs font-medium text-muted-foreground">Copy <strong>{day}</strong> to:</p>
-                      <div className="flex flex-wrap gap-1.5">
+                    <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-2xl border border-[#e8e5e1] bg-white p-4 shadow-xl">
+                      <p className="mb-3 text-xs font-medium text-[#8a8580]">Copy <strong>{day}</strong> to:</p>
+                      <div className="flex flex-wrap gap-2">
                         {DAYS.filter((d) => d !== day).map((d) => {
                           const selected = copyTargets.includes(d);
                           return (
@@ -395,10 +418,10 @@ function Planner() {
                               key={d}
                               onClick={() => setCopyTargets((prev) => selected ? prev.filter((x) => x !== d) : [...prev, d])}
                               className={
-                                "flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium transition " +
+                                "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition " +
                                 (selected
-                                  ? "border-[var(--leaf-green)] bg-[var(--leaf-green)] text-white"
-                                  : "border-border bg-background text-foreground hover:bg-muted")
+                                  ? "border-[#1b4d2e] bg-[#1b4d2e] text-white"
+                                  : "border-[#e8e5e1] bg-white text-[#1a1a1a] hover:bg-[#f0eeeb]")
                               }
                             >
                               {selected && <Check className="h-3 w-3" />}
@@ -407,67 +430,66 @@ function Planner() {
                           );
                         })}
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-2">
+                      <div className="mt-4 flex items-center justify-between gap-2">
                         <button
                           onClick={() => setCopyTargets(DAYS.filter((d) => d !== day))}
-                          className="text-xs text-muted-foreground hover:text-foreground transition"
+                          className="text-xs font-medium text-[#8a8580] hover:text-[#1a1a1a] transition"
                         >
                           Select all
                         </button>
-                        <div className="flex gap-1.5">
-                          <Button size="sm" variant="ghost" onClick={() => setCopyPopover(false)}>Cancel</Button>
-                          <Button size="sm" disabled={copyTargets.length === 0} onClick={() => duplicateDayTo(copyTargets)}>
-                            Copy to {copyTargets.length || ""} day{copyTargets.length !== 1 ? "s" : ""}
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => setCopyPopover(false)} className="rounded-full px-3 font-medium">Cancel</Button>
+                          <Button size="sm" disabled={copyTargets.length === 0} onClick={() => duplicateDayTo(copyTargets)} className="rounded-full bg-[var(--primary-orange)] px-4 font-bold text-white shadow-sm hover:bg-[var(--primary-orange)]/90">
+                            Copy ({copyTargets.length})
                           </Button>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-                <Button onClick={saveAndNext} disabled={saving}>
-                  {saving ? "Saving..." : <>Save & Next <ArrowRight className="ml-1 h-4 w-4" /></>}
+                <Button onClick={saveAndNext} disabled={saving} className="rounded-full bg-[var(--primary-orange)] px-6 font-bold text-white shadow-sm hover:bg-[var(--primary-orange)]/90">
+                  {saving ? "Saving..." : <>Save & Next <ArrowRight className="ml-1.5 h-4 w-4" /></>}
                 </Button>
               </>
             ) : step === "instructions" ? (
               <>
-                <Button variant="outline" onClick={() => setStep("planner")}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />Back to Planner
+                <Button variant="outline" onClick={() => setStep("planner")} className="rounded-full border border-[#e8e5e1] bg-white px-5 font-bold text-[#1a1a1a] shadow-sm hover:bg-[#f0eeeb]">
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />Back to Planner
                 </Button>
-                <Button onClick={() => setStep("review")}>
-                  Next <ArrowRight className="ml-1 h-4 w-4" />
+                <Button onClick={() => setStep("review")} className="rounded-full bg-[var(--primary-orange)] px-6 font-bold text-white shadow-sm hover:bg-[var(--primary-orange)]/90">
+                  Next <ArrowRight className="ml-1.5 h-4 w-4" />
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setStep("instructions")}>
-                  <ArrowLeft className="mr-1 h-4 w-4" />Back to Instructions
+                <Button variant="outline" onClick={() => setStep("instructions")} className="rounded-full border border-[#e8e5e1] bg-white px-5 font-bold text-[#1a1a1a] shadow-sm hover:bg-[#f0eeeb]">
+                  <ArrowLeft className="mr-1.5 h-4 w-4" />Back to Instructions
                 </Button>
-                <Button onClick={exportPDF}>
-                  <Printer className="mr-1 h-4 w-4" />Export to PDF
+                <Button onClick={exportPDF} className="rounded-full bg-[var(--primary-orange)] px-6 font-bold text-white shadow-sm hover:bg-[var(--primary-orange)]/90">
+                  <Printer className="mr-1.5 h-4 w-4" />Export to PDF
                 </Button>
               </>
             )}
           </div>
         </div>
-        {/* Brand gradient line */}
-        <div className="h-[2px] bg-gradient-to-r from-[var(--primary-orange)] via-[var(--leaf-green)] to-[var(--primary-orange)] opacity-60" />
-      </header>
 
+      {/* All interactive step UI — hidden in print */}
+      <div className="print:hidden">
       {/* ====== STEP 1: Diet Planner ====== */}
       {step === "planner" && (
         <>
           {/* Day pills */}
-          <div className="mx-auto max-w-[1600px] px-4 pt-6 print:hidden sm:px-6">
+          <div className="w-full px-6 pt-6 sm:px-8 lg:px-12 print:hidden">
             <div className="flex flex-wrap items-center gap-2">
               {DAYS.map((d) => (
                 <button
                   key={d}
                   onClick={() => setDay(d)}
                   className={
-                    "min-w-[60px] rounded-md border px-4 py-2 text-sm font-medium transition " +
+                    "min-w-[64px] rounded-full px-5 py-2 text-sm font-bold transition shadow-sm " +
                     (day === d
-                      ? "border-[var(--leaf-green)] bg-[var(--leaf-green)] text-white"
-                      : "border-border bg-card text-foreground hover:bg-muted")
+                      ? "bg-[#1b4d2e] text-white"
+                      : "bg-white text-[#1a1a1a] hover:bg-[#f0eeeb] border border-[#e8e5e1]")
                   }
                 >
                   {d}
@@ -477,13 +499,13 @@ function Planner() {
             <p className="mt-2 text-sm text-muted-foreground">Select a day to design its meals.</p>
           </div>
 
-          <div className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[300px_1fr] print:block print:px-0">
+          <div className="w-full grid gap-8 px-6 py-6 sm:px-8 lg:px-12 lg:grid-cols-[380px_1fr] print:block print:px-0">
             {/* Catalogue panel */}
-            <aside className="rounded-xl border border-border bg-card p-4 print:hidden">
-              <h2 className="mb-3 text-2xl font-bold text-[var(--dark-green)]">{fullDay(day)}</h2>
+            <aside className="rounded-2xl border border-[#e8e5e1] bg-white p-5 shadow-sm print:hidden">
+              <h2 className="mb-4 text-2xl font-bold text-[#1b4d2e]">{fullDay(day)}</h2>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input className="pl-9" placeholder="Search foods" value={search} onChange={(e) => setSearch(e.target.value)} />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8580]" />
+                <Input className="pl-9 h-10 rounded-lg border border-[#e8e5e1] focus-visible:ring-[#1b4d2e]" placeholder="Search foods" value={search} onChange={(e) => setSearch(e.target.value)} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {categories.map((c) => (
@@ -500,20 +522,20 @@ function Planner() {
                 ))}
               </div>
               <div className="mt-4 space-y-2">
-                <Button variant="outline" className="w-full mb-1" onClick={() => setFoodDialog({ open: true, food: null })}>
-                  <Plus className="mr-1 h-4 w-4" /> Add catalogue item
+                <Button variant="outline" className="mb-2 mt-1 w-full rounded-lg border border-dashed border-[#e8e5e1] bg-[#faf9f7] text-[#1a1a1a] shadow-none hover:bg-[#f0eeeb]" onClick={() => setFoodDialog({ open: true, food: null })}>
+                  <Plus className="mr-1.5 h-4 w-4 text-[#8a8580]" /> Add custom item
                 </Button>
                 {filteredFoods.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-background p-3">
+                  <div key={f.id} className="flex items-center justify-between gap-2 rounded-xl border border-[#e8e5e1] bg-white p-3 shadow-sm transition hover:shadow-md">
                     <div className="min-w-0">
-                      <div className="truncate font-medium">{f.name}</div>
-                      <div className="text-xs text-muted-foreground">{f.notes || f.category || ""}</div>
+                      <div className="font-medium line-clamp-2">{f.name}</div>
+                      <div className="text-xs text-[#8a8580]">{f.notes || f.category || ""}</div>
                     </div>
                     <div className="flex shrink-0 gap-1">
-                      <button onClick={() => setFoodDialog({ open: true, food: f })} aria-label="Edit" className="rounded-md p-1.5 text-muted-foreground hover:bg-muted">
+                      <button onClick={() => setFoodDialog({ open: true, food: f })} aria-label="Edit" className="rounded-md p-1.5 text-[#8a8580] hover:bg-[#f0eeeb] hover:text-[#1a1a1a]">
                         <Pencil className="h-4 w-4" />
                       </button>
-                      <button onClick={() => setDeleteFoodTarget(f)} aria-label="Delete" className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive">
+                      <button onClick={() => setDeleteFoodTarget(f)} aria-label="Delete" className="rounded-md p-1.5 text-[#8a8580] hover:bg-red-50 hover:text-red-600">
                         <Trash2 className="h-4 w-4" />
                       </button>
                       <AddToSlotButton food={f} slots={currentDay.slots.map((s) => s.slotName)} onAdd={(slot, portion) => addItemToSlot(slot, f, portion)} />
@@ -524,39 +546,39 @@ function Planner() {
             </aside>
 
             {/* Day editor */}
-            <section className="overflow-x-auto print:overflow-visible">
-              <div className={`grid min-w-[900px] gap-3 print:hidden`} style={{ gridTemplateColumns: `repeat(${currentDay.slots.length}, minmax(0, 1fr))` }}>
+            <section className="overflow-x-auto print:overflow-visible pb-4">
+              <div className="grid gap-3 print:hidden" style={{ gridTemplateColumns: `repeat(${currentDay.slots.length}, minmax(220px, 1fr))` }}>
                 {currentDay.slots.map((slot) => {
                   return (
-                    <div key={slot.slotName} className="flex flex-col rounded-xl border border-border bg-card p-3">
+                    <div key={slot.slotName} className="flex flex-col rounded-2xl border border-[#e8e5e1] bg-white p-4 shadow-sm">
                       <div className="flex items-center justify-between gap-1">
                         <h3 className="truncate text-base font-semibold text-[var(--dark-green)]">{slot.slotName}</h3>
                         <div className="flex shrink-0 gap-0.5">
-                          <button onClick={() => renameSlot(slot.slotName)} aria-label="Rename slot" className="rounded p-1 text-muted-foreground hover:bg-muted"><Pencil className="h-3 w-3" /></button>
-                          <button onClick={() => deleteSlot(slot.slotName)} aria-label="Delete slot" className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-3 w-3" /></button>
+                          <button onClick={() => renameSlot(slot.slotName)} aria-label="Rename slot" className="rounded p-1 text-[#8a8580] hover:bg-[#f0eeeb] hover:text-[#1a1a1a]"><Pencil className="h-3 w-3" /></button>
+                          <button onClick={() => deleteSlot(slot.slotName)} aria-label="Delete slot" className="rounded p-1 text-[#8a8580] hover:bg-red-50 hover:text-red-600"><Trash2 className="h-3 w-3" /></button>
                         </div>
                       </div>
                       <Input
                         type="time"
                         value={slot.time}
                         onChange={(e) => setSlotTime(slot.slotName, e.target.value)}
-                        className="mt-2 h-9"
+                        className="mt-2 h-9 rounded-md border border-[#e8e5e1] focus-visible:ring-[#1b4d2e]"
                       />
-                      <div className="mt-2 text-xs text-muted-foreground">{slot.items.length} item{slot.items.length === 1 ? "" : "s"}</div>
+                      <div className="mt-2 text-xs text-[#8a8580]">{slot.items.length} item{slot.items.length === 1 ? "" : "s"}</div>
                       <ul className="mt-3 space-y-2">
                         {slot.items.map((it, idx) => {
                           const food = store.foods.find((f) => f.id === it.foodId);
                           if (!food) return null;
                           return (
-                            <li key={idx} className="group flex items-start justify-between gap-2 rounded-md border border-border bg-background p-2">
+                            <li key={idx} className="group flex items-start justify-between gap-2 rounded-xl border border-[#e8e5e1] bg-[#faf9f7] p-2 shadow-sm transition hover:shadow-md">
                               <div className="min-w-0">
-                                <div className="truncate text-sm font-medium">{food.name}</div>
-                                <div className="text-xs text-muted-foreground">{it.portion}</div>
+                                <div className="text-sm font-bold text-[#1a1a1a] line-clamp-2">{food.name}</div>
+                                <div className="text-xs text-[#8a8580]">{it.portion}</div>
                               </div>
                               <button
                                 onClick={() => removeItem(slot.slotName, idx)}
                                 aria-label="Remove"
-                                className="rounded-md p-1 text-muted-foreground opacity-0 transition group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive print:opacity-100"
+                                className="rounded-md p-1 text-[#8a8580] opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 print:opacity-100"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -599,6 +621,7 @@ function Planner() {
           onDone={goHome}
         />
       )}
+      </div>{/* end print:hidden wrapper for step UI */}
 
       {/* Print preview — branded export (always in DOM for print) */}
       <div className="print-export hidden print:block">
@@ -733,7 +756,7 @@ function Planner() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => blocker.reset?.()}>Cancel</AlertDialogCancel>
-            <Button variant="outline" onClick={() => blocker.proceed?.()}>Discard</Button>
+            <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => blocker.proceed?.()}>Don't Save</Button>
             <AlertDialogAction
               onClick={() => {
                 save(true);
@@ -796,6 +819,7 @@ function Planner() {
           setFoodDialog({ open: false, food: null });
         }}
       />
+      </main>
     </div>
   );
 }
@@ -853,19 +877,19 @@ function InstructionsStep({ plan, store, onUpdate }: InstructionsStepProps) {
   const avoidItems = instructions.avoidList.map((id) => store.instructions.find((i) => i.id === id)).filter(Boolean) as Instruction[];
 
   return (
-    <div className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[300px_1fr] print:hidden">
+    <div className="w-full grid gap-8 px-6 py-8 sm:px-8 lg:px-12 lg:grid-cols-[380px_1fr] print:hidden">
       {/* Left: Instructions Catalogue */}
-      <aside className="rounded-xl border border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-foreground">Instructions Catalogue</h3>
-          <Button size="sm" variant="outline" onClick={() => { setEditingInstr(null); setInstrDialogOpen(true); }}>
+      <aside className="rounded-2xl border border-[#e8e5e1] bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-base font-bold text-[#1b4d2e]">Instructions Catalogue</h3>
+          <Button size="sm" variant="outline" className="rounded-full border border-[#e8e5e1] hover:bg-[#f0eeeb]" onClick={() => { setEditingInstr(null); setInstrDialogOpen(true); }}>
             <Plus className="mr-1 h-3 w-3" /> Add
           </Button>
         </div>
 
-        <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8 text-sm h-8" />
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8a8580]" />
+          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-10 rounded-lg border border-[#e8e5e1] focus-visible:ring-[#1b4d2e]" />
         </div>
 
         <div className="mb-3 flex gap-1 flex-wrap">
@@ -873,55 +897,59 @@ function InstructionsStep({ plan, store, onUpdate }: InstructionsStepProps) {
             <button
               key={c}
               onClick={() => setCatFilter(c)}
-              className={"rounded-md border px-2 py-0.5 text-[11px] font-medium transition " + (catFilter === c ? "border-[var(--leaf-green)] bg-[var(--leaf-green)] text-white" : "border-border bg-background text-muted-foreground hover:bg-muted")}
+              className={"rounded-full border px-3 py-1 text-[11px] font-bold transition " + (catFilter === c ? "border-[#1b4d2e] bg-[#1b4d2e] text-white shadow-sm" : "border-[#e8e5e1] bg-white text-[#8a8580] hover:bg-[#f0eeeb]")}
             >
               {c}
             </button>
           ))}
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto space-y-1.5">
+        <div className="max-h-[60vh] overflow-y-auto space-y-2 mt-4 pr-1">
           {filtered.map((instr) => {
             const inTips = instructions.tips.includes(instr.id);
             const inAvoid = instructions.avoidList.includes(instr.id);
             return (
-              <div key={instr.id} className="group rounded-lg border border-border bg-background p-2.5 text-xs">
+              <div key={instr.id} className="group rounded-xl border border-[#e8e5e1] bg-[#faf9f7] p-3 shadow-sm transition hover:shadow-md">
                 <div className="flex items-start justify-between gap-1 mb-1.5">
-                  <span className={"rounded px-1.5 py-0.5 text-[10px] font-semibold " + (instr.category === "Tip" ? "bg-blue-100 text-blue-700" : instr.category === "Avoid" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700")}>
+                  <span className={"rounded px-1.5 py-0.5 text-[10px] font-semibold " + (instr.category === "Tip" ? "bg-[#1b4d2e]/10 text-[#1b4d2e]" : instr.category === "Avoid" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700")}>
                     {instr.category}
-                    {instr.isHighlighted && " ★"}
+                    {instr.isHighlighted && <span title="Highly Recommended"> ★</span>}
                   </span>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition">
-                    <button onClick={() => { setEditingInstr(instr); setInstrDialogOpen(true); }} className="rounded p-1 hover:bg-muted">
-                      <Pencil className="h-3 w-3 text-muted-foreground" />
+                    <button onClick={() => { setEditingInstr(instr); setInstrDialogOpen(true); }} className="rounded p-1 text-[#8a8580] hover:bg-[#f0eeeb] hover:text-[#1a1a1a]">
+                      <Pencil className="h-3 w-3" />
                     </button>
-                    <button onClick={() => setDeleteTarget(instr)} className="rounded p-1 hover:bg-destructive/10">
-                      <Trash2 className="h-3 w-3 text-destructive" />
+                    <button onClick={() => setDeleteTarget(instr)} className="rounded p-1 text-[#8a8580] hover:bg-red-50 hover:text-red-600">
+                      <Trash2 className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
-                <p className="text-foreground leading-snug mb-2">{instr.text}</p>
+                <p className="text-[#1a1a1a] text-sm leading-snug mb-3">{instr.text}</p>
                 <div className="flex gap-1">
-                  <button
-                    onClick={() => addToTips(instr.id)}
-                    disabled={inTips}
-                    className={"rounded border px-2 py-0.5 text-[10px] font-medium transition " + (inTips ? "border-blue-300 bg-blue-50 text-blue-400 cursor-default" : "border-blue-300 bg-white text-blue-600 hover:bg-blue-50")}
-                  >
-                    {inTips ? "✓ In Tips" : "+ Tips"}
-                  </button>
-                  <button
-                    onClick={() => addToAvoid(instr.id)}
-                    disabled={inAvoid}
-                    className={"rounded border px-2 py-0.5 text-[10px] font-medium transition " + (inAvoid ? "border-red-300 bg-red-50 text-red-400 cursor-default" : "border-red-300 bg-white text-red-600 hover:bg-red-50")}
-                  >
-                    {inAvoid ? "✓ In Avoid" : "+ Avoid"}
-                  </button>
+                  {instr.category !== "Avoid" && (
+                    <button
+                      onClick={() => addToTips(instr.id)}
+                      disabled={inTips}
+                      className={"rounded border px-2 py-0.5 text-[10px] font-bold transition " + (inTips ? "border-[#1b4d2e]/30 bg-[#1b4d2e]/5 text-[#1b4d2e]/70 cursor-default" : "border-[#1b4d2e]/30 bg-white text-[#1b4d2e] hover:bg-[#1b4d2e]/5")}
+                    >
+                      {inTips ? "✓ In Tips" : "+ Tips"}
+                    </button>
+                  )}
+                  {instr.category !== "Tip" && (
+                    <button
+                      onClick={() => addToAvoid(instr.id)}
+                      disabled={inAvoid}
+                      className={"rounded border px-2 py-0.5 text-[10px] font-bold transition " + (inAvoid ? "border-red-300 bg-red-50 text-red-400 cursor-default" : "border-red-300 bg-white text-red-600 hover:bg-red-50")}
+                    >
+                      {inAvoid ? "✓ In Avoid" : "+ Avoid"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
           })}
           {filtered.length === 0 && (
-            <p className="py-6 text-center text-xs text-muted-foreground">No instructions found</p>
+            <p className="py-6 text-center text-sm text-[#8a8580]">No instructions found</p>
           )}
         </div>
       </aside>
@@ -929,21 +957,21 @@ function InstructionsStep({ plan, store, onUpdate }: InstructionsStepProps) {
       {/* Right: Tips & Avoid List */}
       <div className="space-y-6">
         {/* Tips section */}
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <FileText className="h-5 w-5 text-[#0070c0]" />
-            <h3 className="text-lg font-bold text-[#0070c0]">Tips</h3>
-            <span className="ml-auto rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-700">{tipItems.length}</span>
+        <div className="rounded-2xl border border-[#e8e5e1] bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <FileText className="h-6 w-6 text-[#1b4d2e]" />
+            <h3 className="text-xl font-bold text-[#1b4d2e]">Tips</h3>
+            <span className="ml-auto flex h-6 min-w-[24px] items-center justify-center rounded-full bg-[#1b4d2e]/10 px-2 text-xs font-bold text-[#1b4d2e]">{tipItems.length}</span>
           </div>
           {tipItems.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No tips added yet. Add from the catalogue on the left.</p>
+            <p className="py-8 text-center text-sm text-[#8a8580]">No tips added yet. Add from the catalogue on the left.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {tipItems.map((tip, idx) => (
-                <li key={tip.id} className={"flex items-start gap-3 rounded-lg border border-border bg-background p-3 " + (tip.isHighlighted ? "border-l-4 border-l-[#c00000]" : "")}>
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700">{idx + 1}</span>
-                  <p className={"flex-1 text-sm " + (tip.isHighlighted ? "font-semibold text-[#c00000]" : "text-foreground")}>{tip.text}</p>
-                  <button onClick={() => removeFromTips(tip.id)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition">
+                <li key={tip.id} className={"group flex items-start gap-3 rounded-xl border border-[#e8e5e1] bg-[#faf9f7] p-4 shadow-sm transition hover:shadow-md " + (tip.isHighlighted ? "border-l-4 border-l-[#1b4d2e]" : "")}>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1b4d2e]/10 text-xs font-bold text-[#1b4d2e]">{idx + 1}</span>
+                  <p className={"flex-1 text-[15px] " + (tip.isHighlighted ? "font-bold text-[#1b4d2e]" : "text-[#1a1a1a]")}>{tip.text}</p>
+                  <button onClick={() => removeFromTips(tip.id)} className="shrink-0 rounded-md p-1.5 text-[#8a8580] opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 print:opacity-100">
                     <X className="h-4 w-4" />
                   </button>
                 </li>
@@ -953,21 +981,21 @@ function InstructionsStep({ plan, store, onUpdate }: InstructionsStepProps) {
         </div>
 
         {/* Avoid List section */}
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <ListX className="h-5 w-5 text-[#c00000]" />
-            <h3 className="text-lg font-bold text-[#c00000]">Avoid List</h3>
-            <span className="ml-auto rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">{avoidItems.length}</span>
+        <div className="rounded-2xl border border-[#e8e5e1] bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <ListX className="h-6 w-6 text-[#c00000]" />
+            <h3 className="text-xl font-bold text-[#c00000]">Avoid List</h3>
+            <span className="ml-auto flex h-6 min-w-[24px] items-center justify-center rounded-full bg-red-100 px-2 text-xs font-bold text-red-700">{avoidItems.length}</span>
           </div>
           {avoidItems.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">No avoid items added yet. Add from the catalogue on the left.</p>
+            <p className="py-8 text-center text-sm text-[#8a8580]">No avoid items added yet. Add from the catalogue on the left.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {avoidItems.map((item) => (
-                <li key={item.id} className={"flex items-start gap-3 rounded-lg border border-border bg-background p-3 " + (item.isHighlighted ? "border-l-4 border-l-[#c00000]" : "")}>
-                  <span className="mt-0.5 text-base">☐</span>
-                  <p className={"flex-1 text-sm " + (item.isHighlighted ? "font-bold text-[#c00000]" : "text-foreground")}>{item.text}</p>
-                  <button onClick={() => removeFromAvoid(item.id)} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition">
+                <li key={item.id} className={"group flex items-start gap-3 rounded-xl border border-[#e8e5e1] bg-[#faf9f7] p-4 shadow-sm transition hover:shadow-md " + (item.isHighlighted ? "border-l-4 border-l-[#c00000]" : "")}>
+                  <span className="mt-0.5 text-base font-bold text-[#c00000]">☐</span>
+                  <p className={"flex-1 text-[15px] " + (item.isHighlighted ? "font-bold text-[#c00000]" : "text-[#1a1a1a]")}>{item.text}</p>
+                  <button onClick={() => removeFromAvoid(item.id)} className="shrink-0 rounded-md p-1.5 text-[#8a8580] opacity-0 transition group-hover:opacity-100 hover:bg-red-50 hover:text-red-600 print:opacity-100">
                     <X className="h-4 w-4" />
                   </button>
                 </li>

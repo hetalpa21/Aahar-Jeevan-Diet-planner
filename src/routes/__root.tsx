@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -144,6 +145,7 @@ function RootComponent() {
 
 function AuthGate({ queryClient }: { queryClient: QueryClient }) {
   const { isAuthenticated, loading, logout } = useAuth();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (loading) {
     return (
@@ -161,12 +163,6 @@ function AuthGate({ queryClient }: { queryClient: QueryClient }) {
     <StoreProvider>
       <Outlet />
       <Toaster richColors position="top-right" />
-      <button
-        onClick={logout}
-        className="fixed bottom-4 right-4 z-50 rounded-full border border-border bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-md backdrop-blur-sm transition hover:bg-destructive/10 hover:text-destructive print:hidden"
-      >
-        Logout
-      </button>
     </StoreProvider>
   );
 }

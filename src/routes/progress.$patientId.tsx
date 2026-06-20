@@ -17,6 +17,8 @@ import type { ProgressEntry } from "@/lib/types";
 import { Home, Plus, Trash2, TrendingDown, TrendingUp, Minus, ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
 import logo from "@/assets/logo.png";
+import { toTitleCase } from "@/lib/utils";
+import { AppSidebar } from "@/components/AppSidebar";
 
 export const Route = createFileRoute("/progress/$patientId")({
   head: () => ({
@@ -53,6 +55,18 @@ function ProgressTracker() {
     }
     load();
   }, [patientId]);
+
+  // Track recently viewed for dashboard
+  useEffect(() => {
+    if (!patient) return;
+    const key = "aahar_recently_viewed";
+    try {
+      const existing: { patientId: string; name: string; viewedAt: string }[] = JSON.parse(localStorage.getItem(key) || "[]");
+      const filtered = existing.filter((e) => e.patientId !== patient.id);
+      filtered.unshift({ patientId: patient.id, name: patient.name, viewedAt: new Date().toISOString() });
+      localStorage.setItem(key, JSON.stringify(filtered.slice(0, 5)));
+    } catch { /* ignore */ }
+  }, [patient?.id]);
 
   async function addWeek() {
     const nextWeek = entries.length > 0 ? Math.max(...entries.map((e) => e.weekNumber)) + 1 : 1;
@@ -137,44 +151,35 @@ function ProgressTracker() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-border bg-[var(--header-bg)]/95 backdrop-blur-md shadow-sm print:hidden">
-        <div className="mx-auto flex h-[68px] max-w-[1400px] items-center justify-between gap-4 px-5 sm:px-8">
-          <button onClick={goHome} className="flex items-center gap-3 group rounded-lg px-2.5 py-1.5 text-[var(--dark-green)] transition hover:bg-muted">
-            <img src={logo} alt="" width={44} height={44} className="h-11 w-11 rounded-xl object-contain shadow-sm ring-1 ring-border/50 transition group-hover:shadow-md group-hover:scale-[1.04]" />
-            <div className="hidden sm:block text-left">
-              <div className="text-sm font-bold leading-tight text-[var(--dark-green)]">Aahar Jeevan</div>
-              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Home className="h-3 w-3" />
-                Home
-              </div>
-            </div>
-          </button>
-
-          <h1 className="hidden text-lg font-semibold text-[var(--dark-green)] sm:block">Progress Tracker</h1>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => navigate({ to: "/clients" })}>
-              <ArrowLeft className="mr-1 h-4 w-4" />Back to Clients
-            </Button>
-            <Button onClick={addWeek}>
-              <Plus className="mr-1 h-4 w-4" />Add Week
-            </Button>
+    <div className="flex min-h-screen bg-[#faf9f7]">
+      <AppSidebar />
+      <div className="ml-[72px] flex-1 flex flex-col min-h-screen pb-20">
+        {/* Header */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[#e8e5e1] bg-white/95 px-6 py-4 backdrop-blur-md shadow-sm print:hidden">
+          <div className="flex items-center gap-3">
+             <h1 className="text-lg font-semibold text-[var(--dark-green)]">Progress Tracker</h1>
           </div>
-        </div>
-        <div className="h-[2px] bg-gradient-to-r from-[var(--primary-orange)] via-[var(--leaf-green)] to-[var(--primary-orange)] opacity-60" />
-      </header>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => navigate({ to: "/clients" })} className="rounded-full border border-[#e8e5e1] bg-white px-5 font-bold text-[#1a1a1a] shadow-sm hover:bg-[#f0eeeb]">
+              <ArrowLeft className="mr-1.5 h-4 w-4" />Back to Clients
+            </Button>
+            {entries.length > 0 && (
+              <Button onClick={addWeek} className="rounded-full bg-[var(--primary-orange)] px-5 font-bold text-white shadow-sm hover:bg-[var(--primary-orange)]/90">
+                <Plus className="mr-1.5 h-4 w-4" />Add Week {Math.max(...entries.map(e => e.weekNumber)) + 1}
+              </Button>
+            )}
+          </div>
+        </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
+        <main className="mx-auto w-full max-w-[1400px] px-6 py-8">
         {/* Patient info */}
-        <div className="mb-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="mb-6 rounded-2xl border-l-4 border-y border-r border-y-[#e8e5e1] border-r-[#e8e5e1] border-l-[var(--primary-orange)] bg-white p-5 py-5 shadow-sm">
           <div className="flex flex-wrap items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--primary-orange)]/20 text-xl font-bold text-[var(--accent-orange)]">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 text-xl font-bold text-orange-700">
               {patient.name[0]}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[var(--dark-green)]">{patient.name}</h2>
+              <h2 className="text-xl font-bold text-[var(--dark-green)]">{toTitleCase(patient.name)}</h2>
               <p className="text-sm text-muted-foreground">
                 Age {patient.age} · {patient.contact} · Start weight: {patient.currentWeight} kg
               </p>
@@ -190,14 +195,14 @@ function ProgressTracker() {
         )}
 
         {entries.length === 0 && !error ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/20 py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-[#e8e5e1] bg-white py-16 text-center shadow-sm">
             <div className="mb-4 rounded-full bg-[var(--leaf-green)]/10 p-4">
               <TrendingDown className="h-8 w-8 text-[var(--leaf-green)]" />
             </div>
             <h3 className="text-lg font-semibold text-[var(--dark-green)]">No progress entries yet</h3>
             <p className="mt-1 mb-4 text-sm text-muted-foreground">Start tracking by adding the first week's measurements.</p>
-            <Button onClick={addWeek}>
-              <Plus className="mr-1 h-4 w-4" />Add Week 1
+            <Button onClick={addWeek} className="rounded-full bg-[var(--primary-orange)] px-6 font-bold text-white shadow-sm hover:bg-[var(--primary-orange)]/90">
+              <Plus className="mr-1.5 h-4 w-4" />Add Week 1
             </Button>
           </div>
         ) : (
@@ -229,7 +234,8 @@ function ProgressTracker() {
             </div>
           </div>
         )}
-      </main>
+        </main>
+      </div>
 
       {/* Delete confirmation */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
