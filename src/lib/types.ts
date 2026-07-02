@@ -63,6 +63,7 @@ export interface ProgressEntry {
   patientId: string;
   weekNumber: number;
   weight?: number;
+  chest?: number;
   waist?: number;
   lowerWaist?: number;
   thigh?: number;

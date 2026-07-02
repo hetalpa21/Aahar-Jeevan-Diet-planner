@@ -349,6 +349,7 @@ export const getProgressForPatient = createServerFn({ method: "GET" })
       patientId: row.patient_id,
       weekNumber: row.week_number,
       weight: row.weight ? Number(row.weight) : undefined,
+      chest: row.chest ? Number(row.chest) : undefined,
       waist: row.waist ? Number(row.waist) : undefined,
       lowerWaist: row.lower_waist ? Number(row.lower_waist) : undefined,
       thigh: row.thigh ? Number(row.thigh) : undefined,
@@ -365,6 +366,7 @@ export const addProgressEntry = createServerFn({ method: "POST" })
         patient_id: e.patientId,
         week_number: e.weekNumber,
         weight: e.weight,
+        chest: e.chest,
         waist: e.waist,
         lower_waist: e.lowerWaist,
         thigh: e.thigh,
@@ -379,6 +381,7 @@ export const addProgressEntry = createServerFn({ method: "POST" })
       patientId: data.patient_id,
       weekNumber: data.week_number,
       weight: data.weight ? Number(data.weight) : undefined,
+      chest: data.chest ? Number(data.chest) : undefined,
       waist: data.waist ? Number(data.waist) : undefined,
       lowerWaist: data.lower_waist ? Number(data.lower_waist) : undefined,
       thigh: data.thigh ? Number(data.thigh) : undefined,
@@ -391,10 +394,12 @@ export const updateProgressEntry = createServerFn({ method: "POST" })
   .handler(async ({ data: { id, patch } }: { data: { id: string; patch: Partial<ProgressEntry> } }) => {
     const dbPatch: any = {};
     if (patch.weight !== undefined) dbPatch.weight = patch.weight;
+    if (patch.chest !== undefined) dbPatch.chest = patch.chest;
     if (patch.waist !== undefined) dbPatch.waist = patch.waist;
     if (patch.lowerWaist !== undefined) dbPatch.lower_waist = patch.lowerWaist;
     if (patch.thigh !== undefined) dbPatch.thigh = patch.thigh;
     if (patch.notes !== undefined) dbPatch.notes = patch.notes;
+    if (patch.recordedAt !== undefined) dbPatch.recorded_at = patch.recordedAt;
 
     const { error } = await supabase
       .from("progress_entries")

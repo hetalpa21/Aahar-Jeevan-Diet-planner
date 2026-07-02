@@ -77,6 +77,7 @@ function ProgressTracker() {
         patientId,
         weekNumber: nextWeek,
         weight: prefillWeight,
+        chest: undefined,
         waist: undefined,
         lowerWaist: undefined,
         thigh: undefined,
@@ -94,10 +95,12 @@ function ProgressTracker() {
     try {
       await store.updateProgressEntry(entry.id, {
         weight: entry.weight,
+        chest: entry.chest,
         waist: entry.waist,
         lowerWaist: entry.lowerWaist,
         thigh: entry.thigh,
         notes: entry.notes,
+        recordedAt: entry.recordedAt,
       });
       toast.success(`Week ${entry.weekNumber} saved`);
     } catch (err: any) {
@@ -122,7 +125,7 @@ function ProgressTracker() {
   function updateField(id: string, field: keyof ProgressEntry, value: string) {
     setEntries((prev) =>
       prev.map((e) =>
-        e.id === id ? { ...e, [field]: field === "notes" ? value : (value === "" ? undefined : Number(value)) } : e
+        e.id === id ? { ...e, [field]: field === "notes" || field === "recordedAt" ? value : (value === "" ? undefined : Number(value)) } : e
       )
     );
   }
@@ -208,8 +211,18 @@ function ProgressTracker() {
         ) : (
           <div className="overflow-x-auto">
             <div className="inline-flex gap-4 pb-4" style={{ minWidth: entries.length * 240 }}>
-              {entries.map((entry, idx) => {
-                const prev = idx > 0 ? entries[idx - 1] : null;
+              {/* Add week card */}
+              <button
+                onClick={addWeek}
+                className="flex min-w-[200px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/10 p-6 text-muted-foreground transition hover:border-[var(--leaf-green)] hover:bg-[var(--leaf-green)]/5 hover:text-[var(--dark-green)]"
+              >
+                <Plus className="h-8 w-8" />
+                <span className="text-sm font-medium">Add Week</span>
+              </button>
+
+              {[...entries].reverse().map((entry) => {
+                const prevIdx = entries.findIndex((e) => e.id === entry.id) - 1;
+                const prev = prevIdx >= 0 ? entries[prevIdx] : null;
                 return (
                   <WeekCard
                     key={entry.id}
@@ -222,15 +235,6 @@ function ProgressTracker() {
                   />
                 );
               })}
-
-              {/* Add week card */}
-              <button
-                onClick={addWeek}
-                className="flex min-w-[200px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border bg-muted/10 p-6 text-muted-foreground transition hover:border-[var(--leaf-green)] hover:bg-[var(--leaf-green)]/5 hover:text-[var(--dark-green)]"
-              >
-                <Plus className="h-8 w-8" />
-                <span className="text-sm font-medium">Add Week</span>
-              </button>
             </div>
           </div>
         )}
@@ -278,7 +282,7 @@ interface WeekCardProps {
 }
 
 function WeekCard({ entry, prev, saving, onUpdate, onSave, onDelete }: WeekCardProps) {
-  const date = new Date(entry.recordedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" });
+  const dateValue = entry.recordedAt ? new Date(entry.recordedAt).toISOString().split("T")[0] : "";
 
   return (
     <div className="flex min-w-[220px] flex-col rounded-2xl border border-border bg-card shadow-sm transition hover:shadow-md">
@@ -286,7 +290,16 @@ function WeekCard({ entry, prev, saving, onUpdate, onSave, onDelete }: WeekCardP
       <div className="flex items-center justify-between rounded-t-2xl bg-[var(--leaf-green)] px-4 py-3">
         <div>
           <div className="text-base font-bold text-white">Week {entry.weekNumber}</div>
-          <div className="text-[11px] text-white/70">{date}</div>
+          <input
+            type="date"
+            value={dateValue}
+            onChange={(e) => {
+              if (e.target.value) {
+                onUpdate("recordedAt", new Date(e.target.value).toISOString());
+              }
+            }}
+            className="mt-0.5 w-[130px] rounded border-none bg-white/20 px-1.5 py-0.5 text-[11px] text-white outline-none focus:bg-white/30 [color-scheme:dark]"
+          />
         </div>
         <button onClick={onDelete} className="rounded-md p-1.5 text-white/70 transition hover:bg-white/20 hover:text-white" aria-label="Delete week">
           <Trash2 className="h-4 w-4" />
@@ -301,6 +314,13 @@ function WeekCard({ entry, prev, saving, onUpdate, onSave, onDelete }: WeekCardP
           value={entry.weight}
           prev={prev?.weight}
           onChange={(v) => onUpdate("weight", v)}
+        />
+        <MeasurementField
+          label="Chest"
+          unit="in"
+          value={entry.chest}
+          prev={prev?.chest}
+          onChange={(v) => onUpdate("chest", v)}
         />
         <MeasurementField
           label="Waist"
